@@ -1,2 +1,2 @@
-# tallerProgramacionIII
-Un repositorio de Prueba
+# Taller-ProgramacionIII
+Un repositorio de puros pendejos
