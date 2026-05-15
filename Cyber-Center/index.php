@@ -1,14 +1,13 @@
 <?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+session_start();
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-session_start();
-
-$panel_url = 'src/index.php';
-
 if (!empty($_SESSION['active'])) {
-    header('location: ' . $panel_url);
+    header('location: src/');
     exit;
 }
 
@@ -18,79 +17,60 @@ $mensaje_alerta = "";
 
 if (!empty($_POST)) {
     if (empty($_POST['usuario']) || empty($_POST['clave'])) {
-        $mensaje_alerta = '⚠️ Ingrese su usuario y contraseña';
+        $mensaje_alerta = '⚠️ Ingrese su correo y contraseña';
     } else {
         require_once "conexion.php";
 
         if (!$conexion || $conexion->connect_error) {
             $mensaje_alerta = '❌ Error de conexión con la base de datos';
-            error_log("Error de conexión: " . ($conexion->connect_error ?? "conexión nula"));
         } else {
-            $usuario_ingresado = $_POST['usuario'];
-            $clave_ingresada = $_POST['clave'];
+            $correo = trim($_POST['usuario']);
+            $password = $_POST['clave'];
 
-            $stmt = $conexion->prepare("SELECT idusuario, nombre, usuario, clave, estado FROM USUARIO WHERE usuario = ? AND estado = 1");
+            $stmt = $conexion->prepare("SELECT id, nombre_completo, correo_institucional, password_hash, rol, activo FROM usuarios WHERE correo_institucional = ?");
             if ($stmt) {
-                $stmt->bind_param("s", $usuario_ingresado);
+                $stmt->bind_param("s", $correo); 
                 $stmt->execute();
                 $resultado = $stmt->get_result();
 
                 if ($resultado->num_rows === 1) {
-                    $datos_usuario = $resultado->fetch_assoc();
-                    $hash_almacenado = $datos_usuario['clave'];
-
-                    $password_valida = false;
-
-                    if (strlen($hash_almacenado) === 32 && ctype_xdigit($hash_almacenado)) {
-                        if (md5($clave_ingresada) === $hash_almacenado) {
-                            $password_valida = true;
-                            $nuevo_hash = password_hash($clave_ingresada, PASSWORD_DEFAULT);
-                            $update_stmt = $conexion->prepare("UPDATE USUARIO SET clave = ? WHERE idusuario = ?");
-                            $update_stmt->bind_param("si", $nuevo_hash, $datos_usuario['idusuario']);
-                            $update_stmt->execute();
-                            $update_stmt->close();
-                            error_log("Contraseña migrada para usuario: " . $usuario_ingresado);
-                        }
-                    } 
-                    else {
-                        $password_valida = password_verify($clave_ingresada, $hash_almacenado);
-                    }
-
-                    if ($password_valida) {
+                    $usuario = $resultado->fetch_assoc();
+                    if ($usuario['activo'] != 1) {
+                        $mensaje_alerta = '❌ Usuario desactivado.';
+                    } elseif (password_verify($password, $usuario['password_hash'])) {
                         $_SESSION['active'] = true;
-                        $_SESSION['idUser'] = $datos_usuario['idusuario'];
-                        $_SESSION['nombre'] = $datos_usuario['nombre'];
-                        $_SESSION['rol'] = $datos_usuario['rol'] ?? 'empleado';
-                        $_SESSION['user'] = $datos_usuario['usuario'];
-
+                        $_SESSION['idUser'] = $usuario['id'];
+                        $_SESSION['nombre'] = $usuario['nombre_completo'];
+                        $_SESSION['rol'] = $usuario['rol'];
+                        $_SESSION['user'] = $usuario['correo_institucional'];
                         $nombre_usuario = $_SESSION['nombre'];
-                        $ip_usuario = $_SERVER['REMOTE_ADDR'];
-                        $fecha_hora = date('Y-m-d H:i:s');
 
-                        $stmt2 = $conexion->prepare("INSERT INTO HISTORIAL (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
-                        if ($stmt2) {
-                            $sector = 'login';
-                            $accion = 'Inicio de sesión';
-                            $stmt2->bind_param("sssss", $nombre_usuario, $ip_usuario, $fecha_hora, $sector, $accion);
-                            $stmt2->execute();
-                            $stmt2->close();
-                        } else {
-                            error_log("Error prepare historial: " . $conexion->error);
-                        }
+                        $upd = $conexion->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
+                        $upd->bind_param("i", $usuario['id']);
+                        $upd->execute();
+                        $upd->close();
+
+                        $ip = $_SERVER['REMOTE_ADDR'];
+                        $fecha = date('Y-m-d H:i:s');
+                        $hist = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+                        $sector = 'login';
+                        $accion = 'Inicio de sesión exitoso';
+                        $hist->bind_param("sssss", $nombre_usuario, $ip, $fecha, $sector, $accion);
+                        $hist->execute();
+                        $hist->close();
 
                         $login_exitoso = true;
                     } else {
-                        $mensaje_alerta = '❌ Usuario o contraseña incorrectos';
+                        $mensaje_alerta = '❌ Contraseña incorrecta';
                         session_destroy();
                     }
                 } else {
-                    $mensaje_alerta = '❌ Usuario o contraseña incorrectos';
+                    $mensaje_alerta = '❌ Correo no registrado';
                     session_destroy();
                 }
                 $stmt->close();
             } else {
-                $mensaje_alerta = '❌ Error en el sistema. Intente más tarde.';
-                error_log("Error prepare login: " . $conexion->error);
+                $mensaje_alerta = '❌ Error en la consulta';
             }
         }
     }
@@ -267,7 +247,6 @@ if (!empty($_POST)) {
         <div class="cyber-note" style="border: none; margin-top: 15px;">Cargando panel de control de equipos...</div>
     </div>
 
-    <!-- Formulario de login -->
     <div class="login-card" id="loginFormContainer">
         <div class="logo-wrapper">
             <img src="assets/img/logo.png" alt="CyberCenter UNERG">
@@ -281,8 +260,8 @@ if (!empty($_POST)) {
             <?php endif; ?>
 
             <div class="input-group">
-                <i class="fas fa-user"></i>
-                <input type="text" name="usuario" placeholder="Usuario (empleado)" required autofocus>
+                <i class="fas fa-envelope"></i>
+                <input type="email" name="usuario" placeholder="Correo institucional" required autofocus>
             </div>
             <div class="input-group">
                 <i class="fas fa-lock"></i>
@@ -296,27 +275,18 @@ if (!empty($_POST)) {
         <div class="cyber-note">
             <i class="fas fa-desktop"></i> Control de PCs · Temporizador · Ventas · Reportes
         </div>
-
-        <noscript>
-            <div class="alert-error" style="margin-top: 15px; background: #2a1a1a;">
-                ⚠️ JavaScript desactivado. Si ya iniciaste sesión, haz clic 
-                <a href="<?php echo $panel_url; ?>" style="color: #4facfe;">aquí</a> para continuar.
-            </div>
-        </noscript>
     </div>
 
     <script>
         <?php if ($login_exitoso): ?>
             document.getElementById('loginFormContainer').style.display = 'none';
-            const loader = document.getElementById('loader-overlay');
-            loader.style.display = 'flex';
-
+            document.getElementById('loader-overlay').style.display = 'flex';
             let progreso = 0;
             const barra = document.getElementById('progressFill');
             const intervalo = setInterval(() => {
                 if (progreso >= 100) {
                     clearInterval(intervalo);
-                    window.location.href = '<?php echo $panel_url; ?>';
+                    window.location.href = 'src/';
                 } else {
                     progreso += 3;
                     barra.style.width = progreso + '%';
