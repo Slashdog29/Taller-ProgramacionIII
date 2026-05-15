@@ -11,7 +11,7 @@
  Target Server Version : 120202 (12.2.2-MariaDB)
  File Encoding         : 65001
 
- Date: 15/05/2026 01:19:31
+ Date: 15/05/2026 01:45:57
 */
 
 SET NAMES utf8mb4;
@@ -34,7 +34,7 @@ CREATE TABLE `DETALLE_PERSONA`  (
   PRIMARY KEY (`id_detalle`) USING BTREE,
   UNIQUE INDEX `id_persona`(`id_persona` ASC) USING BTREE,
   CONSTRAINT `1` FOREIGN KEY (`id_persona`) REFERENCES `PERSONA` (`id_persona`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of DETALLE_PERSONA
@@ -55,10 +55,28 @@ CREATE TABLE `EQUIPO`  (
   `estado_equipo` enum('Disponible','Ocupado','Mantenimiento') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NULL DEFAULT 'Disponible',
   PRIMARY KEY (`id_equipo`) USING BTREE,
   UNIQUE INDEX `numero_equipo`(`numero_equipo` ASC) USING BTREE
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of EQUIPO
+-- ----------------------------
+
+-- ----------------------------
+-- Table structure for HISTORIAL
+-- ----------------------------
+DROP TABLE IF EXISTS `HISTORIAL`;
+CREATE TABLE `HISTORIAL`  (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `usuario` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci NULL DEFAULT NULL,
+  `ip` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci NULL DEFAULT NULL,
+  `fyh` datetime NULL DEFAULT NULL,
+  `sector` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci NULL DEFAULT NULL,
+  `acciones` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_uca1400_ai_ci NULL DEFAULT NULL,
+  PRIMARY KEY (`id`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_uca1400_ai_ci ROW_FORMAT = Dynamic;
+
+-- ----------------------------
+-- Records of HISTORIAL
 -- ----------------------------
 
 -- ----------------------------
@@ -77,7 +95,7 @@ CREATE TABLE `PERIFERICO`  (
   UNIQUE INDEX `serial`(`serial` ASC) USING BTREE,
   INDEX `id_equipo`(`id_equipo` ASC) USING BTREE,
   CONSTRAINT `1` FOREIGN KEY (`id_equipo`) REFERENCES `EQUIPO` (`id_equipo`) ON DELETE CASCADE ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of PERIFERICO
@@ -100,7 +118,7 @@ CREATE TABLE `PERSONA`  (
   UNIQUE INDEX `email`(`email` ASC) USING BTREE,
   INDEX `id_tipo_usuario`(`id_tipo_usuario` ASC) USING BTREE,
   CONSTRAINT `1` FOREIGN KEY (`id_tipo_usuario`) REFERENCES `TIPO_USUARIO` (`id_tipo_usuario`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of PERSONA
@@ -124,7 +142,7 @@ CREATE TABLE `RESERVA`  (
   INDEX `id_equipo`(`id_equipo` ASC) USING BTREE,
   CONSTRAINT `1` FOREIGN KEY (`id_persona`) REFERENCES `PERSONA` (`id_persona`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `2` FOREIGN KEY (`id_equipo`) REFERENCES `EQUIPO` (`id_equipo`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB AUTO_INCREMENT = 1 CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of RESERVA
@@ -139,7 +157,7 @@ CREATE TABLE `TIPO_USUARIO`  (
   `nombre_tipo` enum('Estudiante','Profesor','Invitado','Administrativo') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   PRIMARY KEY (`id_tipo_usuario`) USING BTREE,
   UNIQUE INDEX `nombre_tipo`(`nombre_tipo` ASC) USING BTREE
-) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = Dynamic;
+) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_general_ci ROW_FORMAT = DYNAMIC;
 
 -- ----------------------------
 -- Records of TIPO_USUARIO
@@ -148,6 +166,25 @@ INSERT INTO `TIPO_USUARIO` VALUES (1, 'Estudiante');
 INSERT INTO `TIPO_USUARIO` VALUES (2, 'Profesor');
 INSERT INTO `TIPO_USUARIO` VALUES (3, 'Invitado');
 INSERT INTO `TIPO_USUARIO` VALUES (4, 'Administrativo');
+
+-- ----------------------------
+-- Table structure for USUARIO
+-- ----------------------------
+DROP TABLE IF EXISTS `USUARIO`;
+CREATE TABLE `USUARIO`  (
+  `idusuario` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
+  `correo` varchar(100) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
+  `usuario` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
+  `clave` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_spanish_ci NOT NULL,
+  `estado` int NOT NULL DEFAULT 1,
+  PRIMARY KEY (`idusuario`) USING BTREE
+) ENGINE = InnoDB AUTO_INCREMENT = 2 CHARACTER SET = utf8mb3 COLLATE = utf8mb3_spanish_ci ROW_FORMAT = DYNAMIC;
+
+-- ----------------------------
+-- Records of USUARIO
+-- ----------------------------
+INSERT INTO `USUARIO` VALUES (1, 'Administrador', 'admin@admin.com', 'admin', '21232f297a57a5a743894a0e4a801fc3', 1);
 
 -- ----------------------------
 -- Triggers structure for table RESERVA
