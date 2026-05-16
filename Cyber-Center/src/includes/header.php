@@ -1,7 +1,7 @@
 <?php
 session_start();
 if (empty($_SESSION['active'])) {
-    header('Location: ../index.php');
+    header('location: ../');
     exit;
 }
 $nombre_usuario = $_SESSION['nombre'];
