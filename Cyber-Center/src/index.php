@@ -1,211 +1,195 @@
-<?php 
+<?php
 include_once "includes/header.php";
 require "../conexion.php";
 
-// Datos de sesión y entorno
 $nombre = $_SESSION['nombre'];
-$ip     = $_SERVER['REMOTE_ADDR'];
-$fyh    = date('Y-m-d H:i:s');
-$sector = "Panel Principal";
-$acciones = "Acceso al Dashboard";
+$ip = $_SERVER['REMOTE_ADDR'];
+$fecha_hora = date('Y-m-d H:i:s');
 
-// Registro en historial mediante prepared statement para seguridad
-$stmtHist = $conexion->prepare("INSERT INTO historial(usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
-$stmtHist->bind_param("sssss", $nombre, $ip, $fyh, $sector, $acciones);
-$stmtHist->execute();
+$sector = "Dashboard";
+$accion = "Acceso al panel principal";
+$stmt = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+if ($stmt) {
+    $stmt->bind_param("sssss", $nombre, $ip, $fecha_hora, $sector, $accion);
+    $stmt->execute();
+    $stmt->close();
+}
 
-// Conteos rápidos desde la base de datos real
-$resU = mysqli_query($conexion, "SELECT COUNT(*) as total FROM usuarios");
-$totalU = mysqli_fetch_assoc($resU)['total'];
+$totalUsuarios = $conexion->query("SELECT COUNT(*) as t FROM usuarios WHERE activo=1")->fetch_assoc()['t'] ?? 0;
+$totalClientes = $conexion->query("SELECT COUNT(*) as t FROM clientes WHERE estado_cuenta='activo'")->fetch_assoc()['t'] ?? 0;
+$totalEquipos = $conexion->query("SELECT COUNT(*) as t FROM computadoras WHERE estado_operativo IN ('disponible','ocupado')")->fetch_assoc()['t'] ?? 0;
+$disponibles = $conexion->query("SELECT COUNT(*) as t FROM computadoras WHERE estado_operativo='disponible'")->fetch_assoc()['t'] ?? 0;
+$sesionesActivas = $conexion->query("SELECT COUNT(*) as t FROM sesiones WHERE estado_transaccion='en_curso'")->fetch_assoc()['t'] ?? 0;
+$ingresosHoy = $conexion->query("SELECT COALESCE(SUM(monto_total_pagado),0) as t FROM sesiones WHERE DATE(hora_fin)=CURDATE() AND estado_transaccion='finalizado'")->fetch_assoc()['t'] ?? 0;
+$ingresosMes = $conexion->query("SELECT COALESCE(SUM(monto_total_pagado),0) as t FROM sesiones WHERE MONTH(hora_fin)=MONTH(CURDATE()) AND YEAR(hora_fin)=YEAR(CURDATE()) AND estado_transaccion='finalizado'")->fetch_assoc()['t'] ?? 0;
 
-$resP = mysqli_query($conexion, "SELECT COUNT(*) as total FROM clientes");
-$totalP = mysqli_fetch_assoc($resP)['total'];
+$labels = $sesionesData = $ingresosData = [];
+for ($i = 6; $i >= 0; $i--) {
+    $fecha = date('Y-m-d', strtotime("-$i days"));
+    $labels[] = date('d M', strtotime($fecha));
+    $sesionesData[] = $conexion->query("SELECT COUNT(*) as t FROM sesiones WHERE DATE(hora_inicio)='$fecha'")->fetch_assoc()['t'] ?? 0;
+    $ingresosData[] = $conexion->query("SELECT COALESCE(SUM(monto_total_pagado),0) as t FROM sesiones WHERE DATE(hora_fin)='$fecha' AND estado_transaccion='finalizado'")->fetch_assoc()['t'] ?? 0;
+}
 
-$resE = mysqli_query($conexion, "SELECT COUNT(*) as total FROM computadoras");
-$totalE = mysqli_fetch_assoc($resE)['total'];
+$topClientes = $topGastos = [];
+$resTop = $conexion->query("SELECT CONCAT(nombre,' ',apellido) as nombre, SUM(s.monto_total_pagado) as total FROM clientes c JOIN sesiones s ON c.id=s.cliente_id WHERE s.estado_transaccion='finalizado' GROUP BY c.id ORDER BY total DESC LIMIT 5");
+if ($resTop) {
+    while ($row = $resTop->fetch_assoc()) {
+        $topClientes[] = $row['nombre'];
+        $topGastos[] = $row['total'];
+    }
+}
+
+$actividad = [];
+$resAct = $conexion->query("SELECT usuario, acciones, fyh FROM historial ORDER BY fyh DESC LIMIT 5");
+if ($resAct) {
+    while ($row = $resAct->fetch_assoc()) $actividad[] = $row;
+}
 ?>
 
-<style>
-    :root {
-        --primary: #4f46e5;
-        --success: #10b981;
-        --warning: #f59e0b;
-        --bg-body: #f8fafc;
-        --card-border: #f1f5f9;
-    }
-
-    .dashboard-container {
-        padding: 1.5rem;
-        animation: fadeIn 0.8s ease-out;
-        background-color: transparent;
-    }
-
-    @keyframes fadeIn {
-        from { opacity: 0; transform: translateY(10px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .page-header {
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(15px);
-        -webkit-backdrop-filter: blur(15px);
-        padding: 1.5rem 2rem;
-        border-radius: 16px;
-        margin-bottom: 2rem;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-        border: 1px solid rgba(255, 255, 255, 0.15);
-    }
-
-    .page-header h1 {
-        font-weight: 800;
-        font-size: 1.5rem;
-        color: #ffffff;
-        letter-spacing: -0.5px;
-        margin: 0;
-    }
-    
-    .page-header p {
-        color: rgba(255, 255, 255, 0.8) !important;
-    }
-
-    .stat-card {
-        background: rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        border-radius: 20px;
-        padding: 1.8rem;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        text-decoration: none !important;
-        display: block;
-        position: relative;
-        overflow: hidden;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-    }
-
-    .stat-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 4px;
-        height: 100%;
-        transition: width 0.3s ease;
-    }
-
-    .card-primary::before { background: var(--primary); }
-    .card-success::before { background: var(--success); }
-    .card-warning::before { background: var(--warning); }
-
-    .stat-card:hover {
-        transform: translateY(-5px);
-        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.05), 0 10px 10px -5px rgba(0, 0, 0, 0.02);
-        border-color: #e2e8f0;
-    }
-
-    .stat-card:hover::before {
-        width: 6px;
-    }
-
-    .stat-label {
-        font-size: 0.875rem;
-        font-weight: 700;
-        color: rgba(255, 255, 255, 0.7);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-
-    .stat-value {
-        font-size: 2.2rem;
-        font-weight: 800;
-        color: #ffffff;
-        margin: 0.5rem 0;
-        line-height: 1;
-    }
-
-    .stat-icon {
-        width: 52px;
-        height: 52px;
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.4rem;
-        background-color: rgba(248, 250, 252, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.4);
-    }
-</style>
-
-<div class="dashboard-container">
-    <div class="page-header">
+<div class="container px-0">
+    <!-- Encabezado glass -->
+    <div class="glass-card p-3 p-md-4 mb-4 d-flex flex-wrap justify-content-between align-items-center">
         <div>
-            <h1>Panel de control de equipos</h1>
-            <p class="text-muted small m-0">Bienvenido de nuevo, <strong><?php echo $nombre; ?></strong></p>
+            <h1 class="h3 mb-1"><i class="fas fa-chart-line me-2"></i>Panel de Control</h1>
+            <p class="mb-0 text-white-50">Bienvenido, <strong><?php echo htmlspecialchars($nombre); ?></strong></p>
         </div>
-        <div class="d-flex align-items-center">
-            <span class="badge badge-light p-2 mr-3 text-muted"><i class="far fa-calendar-alt mr-1"></i> <?php echo date('d M, Y'); ?></span>
-            <img src="../assets/img/images_800x800.png" class="rounded-circle shadow-sm" height="45" width="45" style="object-fit: cover; border: 2px solid white;">
+        <div class="mt-2 mt-sm-0">
+            <span class="badge bg-primary bg-opacity-25 p-2 me-2"><i class="far fa-calendar-alt"></i> <?php echo date('d/m/Y'); ?></span>
+            <span class="badge bg-primary bg-opacity-25 p-2"><i class="fas fa-clock"></i> <?php echo date('h:i A'); ?></span>
         </div>
     </div>
 
-    <div class="row">
-        <!-- Usuarios del Sistema -->
-        <div class="col-xl-4 col-md-6 mb-4">
-            <a href="usuarios.php" class="stat-card card-primary">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <span class="stat-label">Administradores</span>
-                        <div class="stat-value"><?php echo $totalU; ?></div>
-                        <div class="text-primary small font-weight-bold">
-                            <i class="fas fa-shield-alt mr-1"></i> Ver privilegios
-                        </div>
-                    </div>
-                    <div class="stat-icon text-primary">
-                        <i class="fas fa-user-shield"></i>
-                    </div>
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="glass-card stat-card">
+                <div class="d-flex justify-content-between">
+                    <div><div class="stat-title">Usuarios Activos</div><div class="stat-value"><?php echo $totalUsuarios; ?></div><div class="small text-white-50">Con acceso</div></div>
+                    <div class="stat-icon"><i class="fas fa-user-shield"></i></div>
                 </div>
-            </a>
+            </div>
         </div>
-
-        <!-- Personas / Clientes -->
-        <div class="col-xl-4 col-md-6 mb-4">
-            <a href="clientes.php" class="stat-card card-success">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <span class="stat-label">Clientes</span>
-                        <div class="stat-value"><?php echo $totalP; ?></div>
-                        <div class="text-success small font-weight-bold">
-                            <i class="fas fa-id-card mr-1"></i> Registro activo
-                        </div>
-                    </div>
-                    <div class="stat-icon text-success">
-                        <i class="fas fa-users"></i>
-                    </div>
+        <div class="col-md-3 col-6">
+            <div class="glass-card stat-card">
+                <div class="d-flex justify-content-between">
+                    <div><div class="stat-title">Clientes Activos</div><div class="stat-value"><?php echo $totalClientes; ?></div><div class="small text-white-50">Habilitados</div></div>
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
                 </div>
-            </a>
+            </div>
         </div>
-
-        <!-- Equipos -->
-        <div class="col-xl-4 col-md-6 mb-4">
-            <a href="config.php" class="stat-card card-warning">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <span class="stat-label">Infraestructura</span>
-                        <div class="stat-value"><?php echo $totalE; ?></div>
-                        <div class="text-warning small font-weight-bold">
-                            <i class="fas fa-desktop mr-1"></i> Equipos vinculados
-                        </div>
-                    </div>
-                    <div class="stat-icon text-warning">
-                        <i class="fas fa-laptop"></i>
-                    </div>
+        <div class="col-md-3 col-6">
+            <div class="glass-card stat-card">
+                <div class="d-flex justify-content-between">
+                    <div><div class="stat-title">Equipos en Red</div><div class="stat-value"><?php echo $totalEquipos; ?></div><div class="small text-white-50"><?php echo $disponibles; ?> disponibles</div></div>
+                    <div class="stat-icon"><i class="fas fa-desktop"></i></div>
                 </div>
-            </a>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="glass-card stat-card">
+                <div class="d-flex justify-content-between">
+                    <div><div class="stat-title">Sesiones Activas</div><div class="stat-value"><?php echo $sesionesActivas; ?></div><div class="small text-white-50">En curso</div></div>
+                    <div class="stat-icon"><i class="fas fa-play-circle"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ingresos -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="glass-card stat-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.15), transparent);">
+                <div class="d-flex justify-content-between">
+                    <div><div class="stat-title">Ingresos Hoy</div><div class="stat-value">$ <?php echo number_format($ingresosHoy,2); ?></div><div class="small text-white-50"><?php echo date('d/m/Y'); ?></div></div>
+                    <div class="stat-icon"><i class="fas fa-coins"></i></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="glass-card stat-card" style="background: linear-gradient(135deg, rgba(79,70,229,0.15), transparent);">
+                <div class="d-flex justify-content-between">
+                    <div><div class="stat-title">Ingresos del Mes</div><div class="stat-value">$ <?php echo number_format($ingresosMes,2); ?></div><div class="small text-white-50"><?php echo date('F Y'); ?></div></div>
+                    <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Gráficos -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="glass-card chart-container">
+                <h5 class="mb-3"><i class="fas fa-chart-simple"></i> Sesiones por día</h5>
+                <canvas id="sessionsChart" style="height: 250px; width: 100%;"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="glass-card chart-container">
+                <h5 class="mb-3"><i class="fas fa-dollar-sign"></i> Ingresos por día</h5>
+                <canvas id="revenueChart" style="height: 250px; width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-6">
+            <div class="glass-card chart-container">
+                <h5 class="mb-3"><i class="fas fa-trophy"></i> Top 5 Clientes</h5>
+                <canvas id="topClientsChart" style="height: 220px; width: 100%;"></canvas>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="glass-card p-3">
+                <h5 class="mb-3"><i class="fas fa-history"></i> Actividad Reciente</h5>
+                <ul class="list-unstyled">
+                    <?php if(empty($actividad)): ?>
+                        <li>No hay actividad reciente</li>
+                    <?php else: ?>
+                        <?php foreach($actividad as $act): ?>
+                        <li class="activity-item">
+                            <div class="activity-icon"><i class="fas fa-user-circle"></i></div>
+                            <div>
+                                <div class="fw-semibold"><?php echo htmlspecialchars($act['usuario']); ?></div>
+                                <div class="small text-white-50"><?php echo htmlspecialchars($act['acciones']); ?></div>
+                                <div class="small text-white-50 opacity-50"><?php echo date('d/m/Y H:i', strtotime($act['fyh'])); ?></div>
+                            </div>
+                        </li>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
+                </ul>
+            </div>
         </div>
     </div>
 </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    // Datos desde PHP
+    const labels = <?php echo json_encode($labels); ?>;
+    const sessionsData = <?php echo json_encode($sesionesData); ?>;
+    const revenueData = <?php echo json_encode($ingresosData); ?>;
+    const topNames = <?php echo json_encode($topClientes); ?>;
+    const topSpent = <?php echo json_encode($topGastos); ?>;
+
+    new Chart(document.getElementById('sessionsChart'), {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Sesiones', data: sessionsData, backgroundColor: 'rgba(79,70,229,0.6)', borderRadius: 8 }] },
+        options: { responsive: true, maintainAspectRatio: true, scales: { y: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#cbd5e1' } } }, plugins: { legend: { labels: { color: '#e2e8f0' } } } }
+    });
+
+    new Chart(document.getElementById('revenueChart'), {
+        type: 'line',
+        data: { labels, datasets: [{ label: 'Ingresos ($)', data: revenueData, borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 }] },
+        options: { responsive: true, scales: { y: { ticks: { color: '#cbd5e1', callback: v => '$ '+v }, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { ticks: { color: '#cbd5e1' } } }, plugins: { tooltip: { callbacks: { label: ctx => `$ ${ctx.raw.toFixed(2)}` } }, legend: { labels: { color: '#e2e8f0' } } } }
+    });
+
+    if(topNames.length) {
+        new Chart(document.getElementById('topClientsChart'), {
+            type: 'bar',
+            data: { labels: topNames, datasets: [{ label: 'Total gastado ($)', data: topSpent, backgroundColor: 'rgba(245,158,11,0.7)', borderRadius: 8 }] },
+            options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, scales: { x: { ticks: { color: '#cbd5e1', callback: v => '$ '+v } }, y: { ticks: { color: '#cbd5e1' } } }, plugins: { legend: { labels: { color: '#e2e8f0' } } } }
+        });
+    }
+</script>
 
 <?php include_once "includes/footer.php"; ?>
