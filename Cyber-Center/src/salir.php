@@ -1,6 +1,6 @@
 <?php
 session_start();
-require_once "conexion.php";
+require_once "../conexion.php";
 
 if (isset($_SESSION['nombre'])) {
     $nombre = $_SESSION['nombre'];
@@ -18,6 +18,6 @@ if (isset($_SESSION['nombre'])) {
 }
 
 session_destroy();
-header("Location: index.php");
+header("Location: ../index.php");
 exit;
 ?>
