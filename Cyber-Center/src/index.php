@@ -78,12 +78,14 @@ if ($resAct) {
             </div>
         </div>
         <div class="col-md-3 col-6">
-            <div class="glass-card stat-card">
-                <div class="d-flex justify-content-between">
-                    <div><div class="stat-title">Equipos en Red</div><div class="stat-value"><?php echo $totalEquipos; ?></div><div class="small text-white-50"><?php echo $disponibles; ?> disponibles</div></div>
-                    <div class="stat-icon"><i class="fas fa-desktop"></i></div>
+            <a href="equipos.php" class="text-decoration-none">
+                <div class="glass-card stat-card">
+                    <div class="d-flex justify-content-between">
+                        <div><div class="stat-title">Equipos en Red</div><div class="stat-value text-white"><?php echo $totalEquipos; ?></div><div class="small text-white-50"><?php echo $disponibles; ?> disponibles</div></div>
+                        <div class="stat-icon"><i class="fas fa-desktop"></i></div>
+                    </div>
                 </div>
-            </div>
+            </a>
         </div>
         <div class="col-md-3 col-6">
             <div class="glass-card stat-card">
