@@ -1,13 +1,10 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
 session_start();
-
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 if (!empty($_SESSION['active'])) {
-    header('location: src/');
+    header('Location: src/index.php');
     exit;
 }
 
@@ -15,65 +12,55 @@ $login_exitoso = false;
 $nombre_usuario = "";
 $mensaje_alerta = "";
 
-if (!empty($_POST)) {
-    if (empty($_POST['usuario']) || empty($_POST['clave'])) {
-        $mensaje_alerta = '⚠️ Ingrese su correo y contraseña';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once "conexion.php";
+
+    $usuario = trim($_POST['usuario']);
+    $clave = trim($_POST['clave']);
+
+    if (empty($usuario) || empty($clave)) {
+        $mensaje_alerta = "⚠️ Ingrese usuario y contraseña";
     } else {
-        require_once "conexion.php";
+        $stmt = $conexion->prepare("SELECT id, nombre_completo, correo_institucional, password_hash, rol FROM usuarios WHERE correo_institucional = ? AND activo = 1");
+        if ($stmt) {
+            $stmt->bind_param("s", $usuario);
+            $stmt->execute();
+            $res = $stmt->get_result();
 
-        if (!$conexion || $conexion->connect_error) {
-            $mensaje_alerta = '❌ Error de conexión con la base de datos';
-        } else {
-            $correo = trim($_POST['usuario']);
-            $password = $_POST['clave'];
+            if ($res->num_rows === 1) {
+                $user = $res->fetch_assoc();
+                if (password_verify($clave, $user['password_hash'])) {
+                    $_SESSION['active'] = true;
+                    $_SESSION['idUser'] = $user['id'];
+                    $_SESSION['nombre'] = $user['nombre_completo'];
+                    $_SESSION['rol'] = $user['rol'];
+                    $_SESSION['user'] = $user['correo_institucional'];
 
-            $stmt = $conexion->prepare("SELECT id, nombre_completo, correo_institucional, password_hash, rol, activo FROM usuarios WHERE correo_institucional = ?");
-            if ($stmt) {
-                $stmt->bind_param("s", $correo); 
-                $stmt->execute();
-                $resultado = $stmt->get_result();
+                    $nombre_usuario = $user['nombre_completo'];
+                    $login_exitoso = true;
 
-                if ($resultado->num_rows === 1) {
-                    $usuario = $resultado->fetch_assoc();
-                    if ($usuario['activo'] != 1) {
-                        $mensaje_alerta = '❌ Usuario desactivado.';
-                    } elseif (password_verify($password, $usuario['password_hash'])) {
-                        $_SESSION['active'] = true;
-                        $_SESSION['idUser'] = $usuario['id'];
-                        $_SESSION['nombre'] = $usuario['nombre_completo'];
-                        $_SESSION['rol'] = $usuario['rol'];
-                        $_SESSION['user'] = $usuario['correo_institucional'];
-                        $nombre_usuario = $_SESSION['nombre'];
-
-                        $upd = $conexion->prepare("UPDATE usuarios SET ultimo_login = NOW() WHERE id = ?");
-                        $upd->bind_param("i", $usuario['id']);
-                        $upd->execute();
-                        $upd->close();
-
-                        $ip = $_SERVER['REMOTE_ADDR'];
-                        $fecha = date('Y-m-d H:i:s');
-                        $hist = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
-                        $sector = 'login';
-                        $accion = 'Inicio de sesión exitoso';
-                        $hist->bind_param("sssss", $nombre_usuario, $ip, $fecha, $sector, $accion);
-                        $hist->execute();
-                        $hist->close();
-
-                        $login_exitoso = true;
-                    } else {
-                        $mensaje_alerta = '❌ Contraseña incorrecta';
-                        session_destroy();
+                    $ip = $_SERVER['REMOTE_ADDR'];
+                    $fecha = date('Y-m-d H:i:s');
+                    $sector = "login";
+                    $accion = "Inicio de sesión";
+                    $stmt2 = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+                    if ($stmt2) {
+                        $stmt2->bind_param("sssss", $nombre_usuario, $ip, $fecha, $sector, $accion);
+                        $stmt2->execute();
+                        $stmt2->close();
                     }
                 } else {
-                    $mensaje_alerta = '❌ Correo no registrado';
-                    session_destroy();
+                    $mensaje_alerta = "❌ Usuario o contraseña incorrectos";
                 }
-                $stmt->close();
             } else {
-                $mensaje_alerta = '❌ Error en la consulta';
+                $mensaje_alerta = "❌ Usuario o contraseña incorrectos";
             }
+            $stmt->close();
+        } else {
+            $mensaje_alerta = "❌ Error en el sistema";
         }
     }
+    $conexion->close();
 }
 ?>
 <!DOCTYPE html>
@@ -81,184 +68,145 @@ if (!empty($_POST)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CyberCenter UNERG | Gestión de Equipos y Tiempos</title>
-    <link href="assets/css/styles.css" rel="stylesheet">
-    <script src="assets/js/all.min.js"></script>
+    <title>CyberCenter | Login</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            height: 100vh;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0f172a, #1e1b4b);
             display: flex;
             align-items: center;
             justify-content: center;
-            background: #0a0a0f;
             font-family: 'Segoe UI', system-ui, sans-serif;
+            position: relative;
             overflow: hidden;
+        }
+
+        /* Animación de partículas (canvas) */
+        #particles-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .login-card {
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(20px);
+            border-radius: 32px;
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 2.5rem;
+            width: 380px;
+            text-align: center;
+            box-shadow: 0 25px 45px rgba(0,0,0,0.3);
+            z-index: 2;
+            transition: transform 0.3s;
             position: relative;
         }
-        .circle {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(80px);
-            z-index: -1;
-            animation: flotar 18s infinite alternate ease-in-out;
+        .login-card:hover {
+            transform: translateY(-5px);
         }
-        .c1 { width: 400px; height: 400px; background: #4facfe; top: -15%; left: -10%; }
-        .c2 { width: 350px; height: 350px; background: #00f2fe; bottom: -10%; right: -10%; animation-delay: -6s; }
-        @keyframes flotar {
-            0% { transform: translate(0, 0); }
-            100% { transform: translate(80px, 80px); }
-        }
-        .logo-wrapper {
-            width: 100px;
-            height: 100px;
-            margin: 0 auto 20px;
-            background: white;
-            border-radius: 25px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
-            border: 3px solid #4facfe;
-        }
-        .logo-wrapper img { width: 70px; }
-        .login-card {
-            background: rgba(20, 20, 35, 0.4);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.15);
-            padding: 40px 35px;
-            border-radius: 40px;
-            width: 420px;
-            text-align: center;
-            box-shadow: 0 25px 45px rgba(0,0,0,0.6);
-            transition: 0.3s;
+        h2 {
+            color: white;
+            font-weight: 600;
         }
         .input-group {
-            position: relative;
-            margin-bottom: 25px;
+            margin-bottom: 1.5rem;
             text-align: left;
+            position: relative;
         }
-        .input-group input {
+        .input-group i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #a5f3fc;
+            z-index: 1;
+        }
+        input {
             width: 100%;
+            padding: 12px 15px 12px 45px;
             background: rgba(255,255,255,0.08);
             border: 1px solid rgba(255,255,255,0.2);
-            outline: none;
-            padding: 14px 18px 14px 45px;
-            border-radius: 30px;
+            border-radius: 40px;
             color: white;
             font-size: 1rem;
             transition: 0.2s;
         }
-        .input-group input:focus {
-            border-color: #4facfe;
+        input:focus {
+            outline: none;
+            border-color: #4f46e5;
             background: rgba(255,255,255,0.12);
-            box-shadow: 0 0 8px rgba(79,172,254,0.5);
         }
-        .input-group i {
-            position: absolute;
-            left: 18px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #4facfe;
-            font-size: 1.1rem;
-        }
-        .btn-login {
+        button {
             width: 100%;
-            padding: 14px;
-            border-radius: 40px;
+            padding: 12px;
+            background: linear-gradient(135deg, #4f46e5, #3b82f6);
             border: none;
-            background: linear-gradient(135deg, #4facfe, #00c3fe);
+            border-radius: 40px;
             color: white;
             font-weight: bold;
             font-size: 1rem;
             cursor: pointer;
             transition: 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
         }
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(79,172,254,0.5);
+        button:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 20px rgba(79,70,229,0.4);
         }
-        .alert-error {
-            color: #ff6b6b;
-            background: rgba(255,75,75,0.15);
+        .alert {
+            background: rgba(239,68,68,0.2);
+            border-left: 3px solid #ef4444;
             padding: 10px;
-            border-radius: 30px;
-            margin-bottom: 20px;
+            border-radius: 20px;
+            margin-bottom: 1rem;
             font-size: 0.85rem;
-            border-left: 3px solid #ff6b6b;
         }
-        #loader-overlay {
+        .loader {
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: #0a0a0f;
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 200;
+            background: rgba(0,0,0,0.8);
             backdrop-filter: blur(10px);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
         }
-        .progress-bar-container {
-            width: 280px;
-            height: 6px;
-            background: rgba(255,255,255,0.2);
-            border-radius: 10px;
-            overflow: hidden;
-            margin-top: 20px;
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(255,255,255,0.3);
+            border-top: 5px solid #4f46e5;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
-        .progress-fill {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #4facfe, #00f2fe);
-            transition: width 0.1s linear;
-        }
-        .welcome-message {
-            color: white;
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-top: 20px;
-        }
-        .cyber-note {
-            margin-top: 20px;
-            font-size: 0.75rem;
-            color: #aaa;
-            border-top: 1px solid rgba(255,255,255,0.1);
-            padding-top: 15px;
-        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
-    <div class="circle c1"></div>
-    <div class="circle c2"></div>
+    <canvas id="particles-canvas"></canvas>
+    <div class="login-card">
+        <i class="fas fa-microchip fa-3x text-primary mb-3"></i>
+        <h2>CyberCenter</h2>
+        <p class="text-white-50 mb-4">Gestión de tiempos y equipos</p>
 
-    <div id="loader-overlay">
-        <div class="logo-wrapper">
-            <img src="assets/img/logo.png" alt="Logo CyberCenter">
-        </div>
-        <div class="welcome-message">Bienvenido, <span id="nombreUsuario"><?php echo htmlspecialchars($nombre_usuario); ?></span></div>
-        <div class="progress-bar-container">
-            <div class="progress-fill" id="progressFill"></div>
-        </div>
-        <div class="cyber-note" style="border: none; margin-top: 15px;">Cargando panel de control de equipos...</div>
-    </div>
+        <?php if ($mensaje_alerta): ?>
+            <div class="alert"><?php echo $mensaje_alerta; ?></div>
+        <?php endif; ?>
 
-    <div class="login-card" id="loginFormContainer">
-        <div class="logo-wrapper">
-            <img src="assets/img/logo.png" alt="CyberCenter UNERG">
-        </div>
-        <h2 style="color: white; margin-bottom: 5px;">CyberCenter</h2>
-        <p style="color: #b0b0b0; margin-bottom: 25px;">Sistema de Gestión de Tiempos y Equipos</p>
-
-        <form method="POST">
-            <?php if (!empty($mensaje_alerta)): ?>
-                <div class="alert-error"><?php echo htmlspecialchars($mensaje_alerta); ?></div>
-            <?php endif; ?>
-
+        <form method="POST" id="loginForm">
             <div class="input-group">
                 <i class="fas fa-envelope"></i>
                 <input type="email" name="usuario" placeholder="Correo institucional" required autofocus>
@@ -267,32 +215,83 @@ if (!empty($_POST)) {
                 <i class="fas fa-lock"></i>
                 <input type="password" name="clave" placeholder="Contraseña" required>
             </div>
-            <button type="submit" class="btn-login">
-                <i class="fas fa-sign-in-alt"></i> Ingresar al sistema
-            </button>
+            <button type="submit"><i class="fas fa-sign-in-alt"></i> Ingresar</button>
         </form>
-
-        <div class="cyber-note">
-            <i class="fas fa-desktop"></i> Control de PCs · Temporizador · Ventas · Reportes
-        </div>
     </div>
 
+    <div id="loaderOverlay" class="loader">
+        <div class="spinner"></div>
+        <div class="loader-text">Redirigiendo al panel...</div>
+    </div>
+
+    <?php if ($login_exitoso): ?>
     <script>
-        <?php if ($login_exitoso): ?>
-            document.getElementById('loginFormContainer').style.display = 'none';
-            document.getElementById('loader-overlay').style.display = 'flex';
-            let progreso = 0;
-            const barra = document.getElementById('progressFill');
-            const intervalo = setInterval(() => {
-                if (progreso >= 100) {
-                    clearInterval(intervalo);
-                    window.location.href = 'src/';
-                } else {
-                    progreso += 3;
-                    barra.style.width = progreso + '%';
-                }
-            }, 50);
-        <?php endif; ?>
+        document.getElementById('loaderOverlay').style.display = 'flex';
+        setTimeout(() => {
+            window.location.href = 'src/index.php';
+        }, 800);
+    </script>
+    <?php endif; ?>
+
+    <script>
+        // Animación de partículas (estilo cyber)
+        const canvas = document.getElementById('particles-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let particles = [];
+        const numParticles = 80;
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 3 + 1;
+                this.speedX = (Math.random() - 0.5) * 1.5;
+                this.speedY = (Math.random() - 0.5) * 1.5;
+                this.color = `rgba(79, 70, 229, ${Math.random() * 0.5 + 0.2})`;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0) this.x = canvas.width;
+                if (this.x > canvas.width) this.x = 0;
+                if (this.y < 0) this.y = canvas.height;
+                if (this.y > canvas.height) this.y = 0;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+        }
+
+        function init() {
+            for (let i = 0; i < numParticles; i++) {
+                particles.push(new Particle());
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            for (let p of particles) {
+                p.update();
+                p.draw();
+            }
+            requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            particles = [];
+            init();
+        });
+
+        init();
+        animate();
     </script>
 </body>
 </html>
