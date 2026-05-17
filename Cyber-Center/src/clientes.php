@@ -62,6 +62,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
         exit;
     }
+
+    // ACTUALIZAR CLIENTE
+    if ($action === 'update') {
+        $id = intval($_POST['id'] ?? 0);
+        $nombre_cliente = trim($_POST['nombre'] ?? '');
+        $apellido = trim($_POST['apellido'] ?? '');
+        $cedula = trim($_POST['cedula_o_codigo'] ?? '');
+        $correo = trim($_POST['correo'] ?? '');
+        $tipo_cliente_id = intval($_POST['tipo_cliente_id'] ?? 0);
+
+        if ($id <= 0 || empty($nombre_cliente) || empty($apellido) || empty($cedula) || empty($correo) || $tipo_cliente_id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Datos insuficientes para actualizar.']);
+            exit;
+        }
+
+        $stmt = $conexion->prepare("UPDATE clientes SET nombre = ?, apellido = ?, cedula_o_codigo = ?, correo = ?, tipo_cliente_id = ? WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param('ssssii', $nombre_cliente, $apellido, $cedula, $correo, $tipo_cliente_id, $id);
+            if ($stmt->execute()) {
+                $accion_historial = "Modificó los datos del cliente ID: " . $id;
+                $stmt_h = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+                if ($stmt_h) {
+                    $stmt_h->bind_param('sssss', $usuario_sesion, $ip, $fecha_hora, $sector, $accion_historial);
+                    $stmt_h->execute();
+                    $stmt_h->close();
+                }
+                echo json_encode(['success' => true, 'message' => 'Cliente actualizado con éxito.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al actualizar: ' . $stmt->error]);
+            }
+            $stmt->close();
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta SQL: ' . $conexion->error]);
+        }
+        exit;
+    }
 }
 
 // Registro de actividad en el historial
@@ -209,7 +245,7 @@ if (!$resultado || !$typeResult) {
                                     break;
                             }
                         ?>
-                            <tr>
+                            <tr data-id="<?= intval($row['id']) ?>" data-nombre="<?= htmlspecialchars($row['nombre']) ?>" data-apellido="<?= htmlspecialchars($row['apellido']) ?>" data-cedula="<?= htmlspecialchars($row['cedula_o_codigo']) ?>" data-correo="<?= htmlspecialchars($row['correo']) ?>" data-tipoid="<?= intval($row['tipo_cliente_id']) ?>">
                                 <td class="fw-bold" style="color: var(--primary-light);">#<?php echo $row['id']; ?></td>
                                 <td>
                                     <div class="fw-semibold"><?php echo htmlspecialchars($row['nombre'] . ' ' . $row['apellido']); ?></div>
@@ -228,7 +264,7 @@ if (!$resultado || !$typeResult) {
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group">
-                                        <button class="btn btn-sm btn-outline-light rounded-pill me-2"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-outline-light rounded-pill me-2 edit-client"><i class="fas fa-edit"></i></button>
                                         <button class="btn btn-sm btn-outline-info rounded-pill"><i class="fas fa-eye"></i></button>
                                     </div>
                                 </td>
@@ -293,6 +329,54 @@ if (!$resultado || !$typeResult) {
     </div>
 </div>
 
+<!-- Modal Editar Cliente -->
+<div class="modal fade" id="editClientModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-user-edit"></i> Editar Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editClientForm">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="id" id="edit_client_id">
+
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" name="nombre" id="edit_nombre" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Apellido</label>
+                        <input type="text" name="apellido" id="edit_apellido" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cédula o Código</label>
+                        <input type="text" name="cedula_o_codigo" id="edit_cedula" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Correo</label>
+                        <input type="email" name="correo" id="edit_correo" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de cliente</label>
+                        <select name="tipo_cliente_id" id="edit_tipo" class="form-select" required>
+                            <option value="">Selecciona un tipo</option>
+                            <?php // Rewind types result for reuse when possible
+                            mysqli_data_seek($typeResult, 0);
+                            while ($type = mysqli_fetch_assoc($typeResult)): ?>
+                                <option value="<?= htmlspecialchars($type['id']) ?>"><?= htmlspecialchars($type['nombre_rol']) ?></option>
+                            <?php endwhile; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Guardar cambios</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="messageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -338,6 +422,51 @@ if (!$resultado || !$typeResult) {
 
             if (result.success) {
                 bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
+                showMessageModal('Éxito', result.message);
+                setTimeout(() => location.reload(), 1200);
+            } else {
+                showMessageModal('Error', result.message);
+            }
+        } catch (error) {
+            console.error('Error en la petición:', error);
+            showMessageModal('Error', 'No se pudo enviar el formulario. Intenta de nuevo.');
+        }
+    });
+
+    // Manejo edición de cliente
+    document.querySelectorAll('.edit-client').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('tr');
+            const id = row.dataset.id;
+            document.getElementById('edit_client_id').value = id;
+            document.getElementById('edit_nombre').value = row.dataset.nombre || '';
+            document.getElementById('edit_apellido').value = row.dataset.apellido || '';
+            document.getElementById('edit_cedula').value = row.dataset.cedula || '';
+            document.getElementById('edit_correo').value = row.dataset.correo || '';
+            const tipo = row.dataset.tipoid || '';
+            document.getElementById('edit_tipo').value = tipo;
+            new bootstrap.Modal(document.getElementById('editClientModal')).show();
+        });
+    });
+
+    document.getElementById('editClientForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+
+            const text = await response.text();
+            let result;
+            try { result = JSON.parse(text); } catch (error) { result = { success: false, message: 'Respuesta inválida del servidor.' }; }
+
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('editClientModal')).hide();
                 showMessageModal('Éxito', result.message);
                 setTimeout(() => location.reload(), 1200);
             } else {
