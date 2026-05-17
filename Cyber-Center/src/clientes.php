@@ -127,6 +127,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
         exit;
     }
+
+    if ($action === 'activate') {
+        $id = intval($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID de cliente inválido.']);
+            exit;
+        }
+
+        $stmt = $conexion->prepare("UPDATE clientes SET estado_cuenta = 'activo' WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param('i', $id);
+            if ($stmt->execute()) {
+                $accion_historial = "Activó al cliente ID: " . $id;
+                $stmt_h = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+                if ($stmt_h) {
+                    $stmt_h->bind_param('sssss', $usuario_sesion, $ip, $fecha_hora, $sector, $accion_historial);
+                    $stmt_h->execute();
+                    $stmt_h->close();
+                }
+                echo json_encode(['success' => true, 'message' => 'Cliente activado correctamente.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al activar el cliente: ' . $stmt->error]);
+            }
+            $stmt->close();
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta SQL: ' . $conexion->error]);
+        }
+        exit;
+    }
 }
 
 // Registro de actividad en el historial
@@ -294,7 +323,11 @@ if (!$resultado || !$typeResult) {
                                 <td class="text-end">
                                     <div class="btn-group">
                                         <button class="btn btn-sm btn-outline-light rounded-pill me-2 edit-client"><i class="fas fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-outline-danger rounded-pill deactivate-client"><i class="fas fa-user-slash"></i></button>
+                                        <?php if ($row['estado_cuenta'] === 'activo') { ?>
+                                            <button class="btn btn-sm btn-outline-danger delete-client"><i class="fas fa-trash-alt"></i></button>
+                                        <?php } else { ?>
+                                            <button class="btn btn-sm btn-outline-success activate-client"><i class="fas fa-check"></i></button>
+                                        <?php } ?>
                                     </div>
                                 </td>
                             </tr>
@@ -557,7 +590,7 @@ if (!$resultado || !$typeResult) {
         }
     });
 
-    document.querySelectorAll('.deactivate-client').forEach(btn => {
+    document.querySelectorAll('.delete-client').forEach(btn => {
         btn.addEventListener('click', () => {
             const row = btn.closest('tr');
             const clientId = row.dataset.id;
@@ -568,6 +601,28 @@ if (!$resultado || !$typeResult) {
                 `¿Deseas desactivar al cliente <strong>${clientName}</strong>? Esta acción impedirá su uso en el sistema.`,
                 async () => {
                     const result = await sendAction('deactivate', clientId);
+                    if (result.success) {
+                        showMessageModal('Éxito', result.message);
+                        setTimeout(() => location.reload(), 1200);
+                    } else {
+                        showMessageModal('Error', result.message);
+                    }
+                }
+            );
+        });
+    });
+
+    document.querySelectorAll('.activate-client').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('tr');
+            const clientId = row.dataset.id;
+            const clientName = row.dataset.nombre + ' ' + row.dataset.apellido;
+
+            showConfirmModal(
+                'Confirmar activación',
+                `¿Deseas activar al cliente <strong>${clientName}</strong>? Podrá volver a estar activo en el sistema.`,
+                async () => {
+                    const result = await sendAction('activate', clientId);
                     if (result.success) {
                         showMessageModal('Éxito', result.message);
                         setTimeout(() => location.reload(), 1200);
