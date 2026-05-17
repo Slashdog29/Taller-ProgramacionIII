@@ -1,0 +1,52 @@
+Para que el archivo .bat funcione como un verdadero agente de control, no basta con dejarlo en el escritorio. Necesitas configurarlo para que se ejecute de forma invisible en segundo plano cada vez que la computadora se encienda o un usuario inicie sesión. Además, debes aplicar un par de restricciones básicas si estás en un entorno universitario para evitar que los estudiantes astutos cierren el script.
+
+Aquí tienes el paso a paso de cómo deberías instalar y configurar el archivo en cada una de las computadoras del Cyber.
+
+Paso 1: Configurar un usuario estándar (No Administrador)
+Por seguridad, los estudiantes que usen las máquinas del Cyber no deben tener permisos de administrador.
+
+Crea una cuenta local en Windows llamada, por ejemplo, Estudiante o Invitado y configúrala como Usuario estándar.
+
+Mantén tu cuenta de administrador protegida con una contraseña que solo tú y los operadores conozcan.
+
+Paso 2: Ubicar el archivo .bat en un lugar seguro
+No dejes el archivo a la vista.
+
+Inicia sesión como Administrador.
+
+Crea una carpeta oculta o guardacelosa dentro del disco local, por ejemplo: C:\ProgramData\CyberCenter\ (La carpeta ProgramData ya es oculta por defecto en Windows).
+
+Guarda allí tu archivo control_cyber.bat.
+
+Paso 3: Hacer que se ejecute al iniciar sesión (Automatización)
+Para que el script arranque solo, debes meter un acceso directo en la carpeta de inicio automático de Windows de la cuenta que van a usar los estudiantes.
+
+Presiona las teclas Windows + R para abrir la ventana de Ejecutar.
+
+Si quieres que se ejecute solo para el usuario estudiante, escribe shell:startup y presiona Enter. Si prefieres que se ejecute para cualquier usuario que inicie sesión en esa máquina, escribe shell:common startup.
+
+Se abrirá una carpeta de Windows. Haz clic derecho dentro de ella, selecciona Nuevo > Acceso directo.
+
+En la ubicación del elemento, busca el archivo original en C:\ProgramData\CyberCenter\control_cyber.bat.
+
+Ponle cualquier nombre y finaliza.
+
+Paso 4: Ocultar la ventana negra de la consola (Opcional pero recomendado)
+Por defecto, los archivos .bat abren una ventana de comandos (la pantalla negra de CMD). Un estudiante podría simplemente darle a la "X" y cerrar tu sistema de control. Para evitar esto y hacer que corra de forma invisible en segundo plano, usamos un pequeño script puente en VBScript.
+
+En la misma carpeta donde guardaste el .bat (C:\ProgramData\CyberCenter\), crea un nuevo archivo de texto.
+
+Cambia su nombre y extensión a invisible.vbs.
+
+Haz clic derecho, dale a editar y pega este código exacto:
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run chr(34) & "C:\ProgramData\CyberCenter\control_cyber.bat" & Chr(34), 0, False
+
+Modificación del paso 3: Si haces esto, el acceso directo que vas a meter en la carpeta de inicio (shell:startup) no debe apuntar al .bat, sino al archivo invisible.vbs. De este modo, al iniciar sesión se arranca el archivo VBScript, el cual ejecuta el .bat en modo oculto sin levantar ventanas.
+
+Paso 5: Probar el funcionamiento
+Cierra sesión de la cuenta de administrador e ingresa a la cuenta Estudiante.
+
+Si todo está bien configurado, no verás ninguna ventana negra.
+
+Abre el Administrador de tareas (Ctrl + Shift + Esc). En la pestaña de "Procesos", deberías ver un proceso llamado cmd.exe o Windows Command Processor consumiendo 0% de recursos, y de forma intermitente cada 30 segundos verás aparecer un subproceso de PowerShell. Eso te confirma que el agente local está enviando consultas a tu servidor Apache.
