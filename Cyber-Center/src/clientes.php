@@ -322,7 +322,7 @@ if (!$resultado || !$typeResult) {
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group">
-                                        <button class="btn btn-sm btn-outline-light rounded-pill me-2 edit-client"><i class="fas fa-edit"></i></button>
+                                        <button class="btn btn-sm btn-outline-light me-2 edit-client"><i class="fas fa-pen"></i></button>
                                         <?php if ($row['estado_cuenta'] === 'activo') { ?>
                                             <button class="btn btn-sm btn-outline-danger delete-client"><i class="fas fa-trash-alt"></i></button>
                                         <?php } else { ?>
