@@ -1,6 +1,7 @@
 <?php
 include_once "includes/header.php";
 require_once "../conexion.php";
+global $conexion;
 
 if (empty($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));

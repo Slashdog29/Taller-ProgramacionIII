@@ -1,7 +1,7 @@
 <?php
 include_once "includes/header.php";
 require_once "../conexion.php";
-
+global $conexion;
 // Registro de actividad en el historial
 $nombre = $_SESSION['nombre'];
 $ip = $_SERVER['REMOTE_ADDR'];
