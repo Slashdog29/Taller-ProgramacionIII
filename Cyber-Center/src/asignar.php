@@ -87,45 +87,63 @@ try {
 
 ?>
 
-<div class="container py-4">
-    <h3 class="mb-3">Asignar dispositivo al cliente</h3>
-
-    <?php if (!empty($mensaje)): ?>
-        <div class="alert alert-info"><?php echo htmlspecialchars($mensaje); ?></div>
-    <?php endif; ?>
-
-    <form method="post" class="row g-3" novalidate>
-        <input type="hidden" name="id_cliente" value="<?php echo intval($id_cliente); ?>">
-
-        <div class="col-md-6">
-            <label class="form-label">Seleccionar computadora (disponible)</label>
-            <select name="id_computadora" class="form-select" required>
-                <option value="">-- Seleccione --</option>
-                <?php while ($row = mysqli_fetch_assoc($res_comp)): ?>
-                    <option value="<?php echo intval($row['id']); ?>"><?php echo htmlspecialchars($row['nombre'] . ' (' . $row['ip_address'] . ')'); ?></option>
-                <?php endwhile; ?>
-            </select>
-            <div class="form-text">Si no aparecen equipos, verifica el campo <strong>estado_operativo</strong> en la tabla de computadoras.</div>
+<div class="container main-content py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h3 class="fw-bold mb-0 text-white">Asignar dispositivo</h3>
+            <p class="text-white-50">Asignación de equipos - Interfaz glass coherente</p>
         </div>
-
-        <div class="col-md-4">
-            <label class="form-label">Duración (minutos)</label>
-            <select name="minutos_duracion" class="form-select" required>
-                <option value="">--  Seleccione minutos --</option>
-                <?php for ($m=15; $m<=240; $m+=15): ?>
-                    <option value="<?php echo $m; ?>"><?php echo $m; ?> minutos</option>
-                <?php endfor; ?>
-            </select>
-            <div class="form-text">Los bloques incrementan de 15 en 15 hasta 240 minutos (4 horas).</div>
-        </div>
-
-        <div class="col-md-2 d-flex align-items-end">
-            <button type="submit" class="btn btn-success w-100">Asignar</button>
-        </div>
-    </form>
-
-    <div class="mt-4">
         <a href="clientes.php" class="btn btn-secondary">Volver a Clientes</a>
+    </div>
+
+    <div class="glass-card p-4">
+        <?php if (!empty($mensaje)): ?>
+            <div class="alert alert-info"><?php echo htmlspecialchars($mensaje); ?></div>
+        <?php endif; ?>
+
+        <form method="post" class="row g-3" novalidate>
+            <input type="hidden" name="id_cliente" value="<?php echo intval($id_cliente); ?>">
+
+            <div class="col-md-6">
+                <label class="form-label">Seleccionar computadora (disponible)</label>
+                <select name="id_computadora" class="form-select" required>
+                    <option value="">-- Seleccione --</option>
+                    <?php
+                    if ($res_comp && mysqli_num_rows($res_comp) > 0) {
+                        while ($row = mysqli_fetch_assoc($res_comp)) {
+                            $id_comp = intval($row['id'] ?? 0);
+                            $label_parts = [];
+                            if (!empty($row['nombre'])) $label_parts[] = $row['nombre'];
+                            elseif (!empty($row['alias'])) $label_parts[] = $row['alias'];
+                            elseif (!empty($row['hostname'])) $label_parts[] = $row['hostname'];
+                            if (!empty($row['ip_address'])) $label_parts[] = '(' . $row['ip_address'] . ')';
+
+                            $label = empty($label_parts) ? ('Equipo #' . $id_comp) : implode(' ', $label_parts);
+                            echo '<option value="' . $id_comp . '">' . htmlspecialchars($label) . '</option>';
+                        }
+                    } else {
+                        echo '<option value="">No hay computadoras disponibles</option>';
+                    }
+                    ?>
+                </select>
+                <div class="form-text">Si no aparecen equipos, verifica el campo <strong>estado_operativo</strong> en la tabla de computadoras.</div>
+            </div>
+
+            <div class="col-md-4">
+                <label class="form-label">Duración (minutos)</label>
+                <select name="minutos_duracion" class="form-select" required>
+                    <option value="">--  Seleccione minutos --</option>
+                    <?php for ($m = 15; $m <= 240; $m += 15): ?>
+                        <option value="<?php echo $m; ?>"><?php echo $m; ?> minutos</option>
+                    <?php endfor; ?>
+                </select>
+                <div class="form-text">Los bloques incrementan de 15 en 15 hasta 240 minutos (4 horas).</div>
+            </div>
+
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-success w-100">Asignar</button>
+            </div>
+        </form>
     </div>
 </div>
 
