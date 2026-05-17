@@ -98,6 +98,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
         exit;
     }
+
+    if ($action === 'deactivate') {
+        $id = intval($_POST['id'] ?? 0);
+        if ($id <= 0) {
+            echo json_encode(['success' => false, 'message' => 'ID de cliente inválido.']);
+            exit;
+        }
+
+        $stmt = $conexion->prepare("UPDATE clientes SET estado_cuenta = 'suspendido' WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param('i', $id);
+            if ($stmt->execute()) {
+                $accion_historial = "Desactivó al cliente ID: " . $id;
+                $stmt_h = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+                if ($stmt_h) {
+                    $stmt_h->bind_param('sssss', $usuario_sesion, $ip, $fecha_hora, $sector, $accion_historial);
+                    $stmt_h->execute();
+                    $stmt_h->close();
+                }
+                echo json_encode(['success' => true, 'message' => 'Cliente desactivado correctamente.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al desactivar el cliente: ' . $stmt->error]);
+            }
+            $stmt->close();
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta SQL: ' . $conexion->error]);
+        }
+        exit;
+    }
 }
 
 // Registro de actividad en el historial
@@ -265,7 +294,7 @@ if (!$resultado || !$typeResult) {
                                 <td class="text-end">
                                     <div class="btn-group">
                                         <button class="btn btn-sm btn-outline-light rounded-pill me-2 edit-client"><i class="fas fa-edit"></i></button>
-                                        <button class="btn btn-sm btn-outline-info rounded-pill"><i class="fas fa-eye"></i></button>
+                                        <button class="btn btn-sm btn-outline-danger rounded-pill deactivate-client"><i class="fas fa-user-slash"></i></button>
                                     </div>
                                 </td>
                             </tr>
@@ -377,6 +406,22 @@ if (!$resultado || !$typeResult) {
     </div>
 </div>
 
+<div class="modal fade" id="confirmModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title" id="confirmModalTitle">Confirmar</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="confirmModalBody"></div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="confirmModalBtn">Aceptar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="messageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -397,6 +442,40 @@ if (!$resultado || !$typeResult) {
         document.getElementById('messageModalTitle').innerText = title;
         document.getElementById('messageModalBody').innerHTML = message;
         new bootstrap.Modal(document.getElementById('messageModal')).show();
+    }
+
+    function showConfirmModal(title, message, onConfirm) {
+        document.getElementById('confirmModalTitle').innerText = title;
+        document.getElementById('confirmModalBody').innerHTML = message;
+        const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+        const confirmBtn = document.getElementById('confirmModalBtn');
+        const newBtn = confirmBtn.cloneNode(true);
+        confirmBtn.parentNode.replaceChild(newBtn, confirmBtn);
+        newBtn.addEventListener('click', () => {
+            confirmModal.hide();
+            onConfirm();
+        });
+        confirmModal.show();
+    }
+
+    async function sendAction(action, clientId) {
+        const data = new FormData();
+        data.append('action', action);
+        data.append('id', clientId);
+        data.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>');
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: data
+            });
+            const text = await response.text();
+            return JSON.parse(text);
+        } catch (error) {
+            console.error('Error en petición fetch:', error);
+            return { success: false, message: 'Error de comunicación con el servidor.' };
+        }
     }
 
     document.getElementById('addClientForm')?.addEventListener('submit', async (e) => {
@@ -476,6 +555,28 @@ if (!$resultado || !$typeResult) {
             console.error('Error en la petición:', error);
             showMessageModal('Error', 'No se pudo enviar el formulario. Intenta de nuevo.');
         }
+    });
+
+    document.querySelectorAll('.deactivate-client').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const row = btn.closest('tr');
+            const clientId = row.dataset.id;
+            const clientName = row.dataset.nombre + ' ' + row.dataset.apellido;
+
+            showConfirmModal(
+                'Confirmar desactivación',
+                `¿Deseas desactivar al cliente <strong>${clientName}</strong>? Esta acción impedirá su uso en el sistema.`,
+                async () => {
+                    const result = await sendAction('deactivate', clientId);
+                    if (result.success) {
+                        showMessageModal('Éxito', result.message);
+                        setTimeout(() => location.reload(), 1200);
+                    } else {
+                        showMessageModal('Error', result.message);
+                    }
+                }
+            );
+        });
     });
 </script>
 
