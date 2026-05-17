@@ -285,13 +285,7 @@ if (!$resultado || !$typeResult) {
                             <?php endwhile; ?>
                         </select>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Estado de cuenta</label>
-                        <select name="estado_cuenta" class="form-select" required>
-                            <option value="activo">Activo</option>
-                            <option value="suspendido">Suspendido</option>
-                        </select>
-                    </div>
+                    <!-- Campo 'Estado de cuenta' eliminado por solicitud -->
                     <button type="submit" class="btn btn-primary w-100">Crear Cliente</button>
                 </form>
             </div>
