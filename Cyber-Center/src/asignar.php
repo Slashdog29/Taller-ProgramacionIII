@@ -14,6 +14,9 @@ require_once __DIR__ . "/../conexion.php"; // $conexion es la conexión mysqli p
 
 $mensaje = '';
 
+// Identificador del operador en sesión (necesario para la columna usuario_operador_id)
+$usuario_operador_id = intval($_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0);
+
 // Obtener id_cliente (viene por GET cuando se hace clic en el botón desde clientes.php)
 $id_cliente = intval($_GET['id_cliente'] ?? 0);
 
@@ -29,7 +32,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $mensaje = "Error: datos incompletos o inválidos.";
     } else {
         // Validación antirreingreso: verificar si el cliente ya tiene una sesión hoy
-        $sql_check = "SELECT COUNT(*) as cnt FROM sesiones WHERE id_cliente = ? AND DATE(hora_inicio) = CURDATE()";
+        // En la base de datos la columna se llama `cliente_id`
+        $sql_check = "SELECT COUNT(*) as cnt FROM sesiones WHERE cliente_id = ? AND DATE(hora_inicio) = CURDATE()";
         $stmt = mysqli_prepare($conexion, $sql_check);
         if ($stmt) {
             mysqli_stmt_bind_param($stmt, 'i', $id_cliente);
@@ -41,11 +45,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($cnt > 0) {
                 $mensaje = "El cliente ya tiene una sesión registrada hoy. No se permite reingreso.";
             } else {
-                // Insertar sesión con hora_inicio = NOW() y hora_fin_estimada calculada por DATE_ADD
-                $sql_insert = "INSERT INTO sesiones (id_cliente, id_computadora, hora_inicio, hora_fin_estimada, estado_transaccion) VALUES (?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), 'en_curso')";
+                // Asegurar que la columna `hora_fin_estimada` exista en la tabla `sesiones`.
+                // Si no existe, la creamos (esto es seguro en instalaciones locales pero requiere permisos ALTER TABLE).
+                $check_col_sql = "SHOW COLUMNS FROM sesiones LIKE 'hora_fin_estimada'";
+                $col_exists = false;
+                $res_col = mysqli_query($conexion, $check_col_sql);
+                if ($res_col) {
+                    if (mysqli_num_rows($res_col) > 0) $col_exists = true;
+                    mysqli_free_result($res_col);
+                }
+                if (!$col_exists) {
+                    @mysqli_query($conexion, "ALTER TABLE sesiones ADD COLUMN hora_fin_estimada TIMESTAMP NULL DEFAULT NULL AFTER hora_inicio");
+                }
+
+                // Insertar sesión con hora_inicio = NOW(), hora_fin_estimada calculada, monto_tarifa_aplicada inicial = 0.00
+                // y el id del operador que crea la sesión (usuario_operador_id)
+                if ($usuario_operador_id <= 0) {
+                    // Si no hay sesión válida, por seguridad usamos el superadmin (id=1) si existe
+                    $usuario_operador_id = 1;
+                }
+
+                $sql_insert = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), 0.00, 'en_curso')";
                 $stmt2 = mysqli_prepare($conexion, $sql_insert);
                 if ($stmt2) {
-                    mysqli_stmt_bind_param($stmt2, 'iii', $id_cliente, $id_computadora, $minutos);
+                    mysqli_stmt_bind_param($stmt2, 'iiii', $id_cliente, $id_computadora, $usuario_operador_id, $minutos);
                     $ok = mysqli_stmt_execute($stmt2);
                     if ($ok) {
                         // Opcional: marcar la computadora como 'ocupada' para que no aparezca en la lista
