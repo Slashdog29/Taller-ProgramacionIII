@@ -1,38 +1,24 @@
 <?php
-// asignar.php
-// Interfaz y Lógica de Asignación de dispositivo a cliente
-// Requiere: conexión MySQL procedimental con $conexion definido en ../conexion.php
-
 include_once "includes/header.php";
 require_once __DIR__ . "/../conexion.php"; // $conexion es la conexión mysqli procedimental
 
-// -----------------------------------------------------------------------------
-// NOTAS: Cambia los nombres de tablas/columnas abajo según tu esquema de BD.
-// - Tabla de computadoras: 'computadoras' (columnas: id, nombre, ip_address, estado_operativo)
-// - Tabla de sesiones: 'sesiones' (columnas: id, id_cliente, id_computadora, hora_inicio, hora_fin_estimada, estado_transaccion, hora_fin)
-// -----------------------------------------------------------------------------
-
 $mensaje = '';
 
-// Identificador del operador en sesión (necesario para la columna usuario_operador_id)
 $usuario_operador_id = intval($_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0);
 
-// Obtener id_cliente (viene por GET cuando se hace clic en el botón desde clientes.php)
+// Obtener id de cliente
 $id_cliente = intval($_GET['id_cliente'] ?? 0);
 
 // Procesamiento del POST cuando se envía el formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    // Recibir campos esperados
     $id_cliente = intval($_POST['id_cliente'] ?? 0);
     $id_computadora = intval($_POST['id_computadora'] ?? 0);
     $minutos = intval($_POST['minutos_duracion'] ?? 0);
 
-    // Validaciones básicas
     if ($id_cliente <= 0 || $id_computadora <= 0 || $minutos <= 0) {
         $mensaje = "Error: datos incompletos o inválidos.";
     } else {
-        // Validación antirreingreso: verificar si el cliente ya tiene una sesión hoy
-        // En la base de datos la columna se llama `cliente_id`
+        // Validación antirreingreso
         $sql_check = "SELECT COUNT(*) as cnt FROM sesiones WHERE cliente_id = ? AND DATE(hora_inicio) = CURDATE()";
         $stmt = mysqli_prepare($conexion, $sql_check);
         if ($stmt) {
@@ -45,8 +31,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($cnt > 0) {
                 $mensaje = "El cliente ya tiene una sesión registrada hoy. No se permite reingreso.";
             } else {
-                // Asegurar que la columna `hora_fin_estimada` exista en la tabla `sesiones`.
-                // Si no existe, la creamos (esto es seguro en instalaciones locales pero requiere permisos ALTER TABLE).
                 $check_col_sql = "SHOW COLUMNS FROM sesiones LIKE 'hora_fin_estimada'";
                 $col_exists = false;
                 $res_col = mysqli_query($conexion, $check_col_sql);
@@ -58,21 +42,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     @mysqli_query($conexion, "ALTER TABLE sesiones ADD COLUMN hora_fin_estimada TIMESTAMP NULL DEFAULT NULL AFTER hora_inicio");
                 }
 
-                // Insertar sesión con hora_inicio = NOW(), hora_fin_estimada calculada, monto_tarifa_aplicada inicial = 0.00
-                // y el id del operador que crea la sesión (usuario_operador_id)
                 if ($usuario_operador_id <= 0) {
-                    // Si no hay sesión válida, por seguridad usamos el superadmin (id=1) si existe
                     $usuario_operador_id = 1;
                 }
+                // Obtener tarifa del tipo de cliente (si existe)
+                $tarifa = 0.00;
+                $tipoSql = "SELECT COALESCE(t.tarifa_por_hora,0) AS tarifa, COALESCE(t.exento_pago,0) AS exento
+                            FROM clientes c
+                            LEFT JOIN tipos_cliente t ON c.tipo_cliente_id = t.id
+                            WHERE c.id = ? LIMIT 1";
+                $tipoStmt = mysqli_prepare($conexion, $tipoSql);
+                if ($tipoStmt) {
+                    mysqli_stmt_bind_param($tipoStmt, 'i', $id_cliente);
+                    mysqli_stmt_execute($tipoStmt);
+                    mysqli_stmt_bind_result($tipoStmt, $tarifa_val, $exento_val);
+                    if (mysqli_stmt_fetch($tipoStmt)) {
+                        $tarifa = floatval($tarifa_val);
+                        if (intval($exento_val) === 1) $tarifa = 0.00;
+                    }
+                    mysqli_stmt_close($tipoStmt);
+                }
 
-                $sql_insert = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), 0.00, 'en_curso')";
+                $sql_insert = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, 'en_curso')";
                 $stmt2 = mysqli_prepare($conexion, $sql_insert);
                 if ($stmt2) {
-                    mysqli_stmt_bind_param($stmt2, 'iiii', $id_cliente, $id_computadora, $usuario_operador_id, $minutos);
+                    mysqli_stmt_bind_param($stmt2, 'iiiid', $id_cliente, $id_computadora, $usuario_operador_id, $minutos, $tarifa);
                     $ok = mysqli_stmt_execute($stmt2);
                     if ($ok) {
-                        // Opcional: marcar la computadora como 'ocupada' para que no aparezca en la lista
-                        $sql_up = "UPDATE computadoras SET estado_operativo = 'ocupada' WHERE id = ?";
+    
+                        $sql_up = "UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = ?";
                         $stmt_up = mysqli_prepare($conexion, $sql_up);
                         if ($stmt_up) {
                             mysqli_stmt_bind_param($stmt_up, 'i', $id_computadora);
@@ -95,26 +93,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Consulta de computadoras disponibles para el selector (estado_operativo = 'disponible')
-// Usamos SELECT * para evitar errores si la tabla no tiene una columna 'nombre'.
-// Construimos la etiqueta de forma dinámica según las columnas disponibles.
-$sql_comp = "SELECT * FROM computadoras WHERE estado_operativo = 'disponible' ORDER BY id ASC";
-try {
-    $res_comp = mysqli_query($conexion, $sql_comp);
-} catch (mysqli_sql_exception $ex) {
-    // Manejo seguro en caso de que mysqli esté configurado para lanzar excepciones
-    $res_comp = false;
-    $mensaje = "Error al obtener las computadoras: " . $ex->getMessage();
+// Consulta de computadoras disponibles con marca y modelo reales
+$sql_comp = "SELECT comp.id, comp.numero_puesto, comp.codigo_bien_nacional, comp.direccion_ip, comp.modelo, m.nombremarca
+             FROM computadoras comp
+             LEFT JOIN marca m ON m.id_marca = comp.marca
+             WHERE comp.estado_operativo = 'disponible'
+             ORDER BY comp.numero_puesto ASC";
+$res_comp = mysqli_query($conexion, $sql_comp);
+if ($res_comp === false) {
+    $mensaje = "Error al obtener las computadoras: " . mysqli_error($conexion);
 }
-
-
 ?>
 
 <div class="container main-content py-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <h3 class="fw-bold mb-0 text-white">Asignar dispositivo</h3>
-            <p class="text-white-50">Asignación de equipos </p>
+            <p class="text-white-50">Asignación de equipos</p>
         </div>
         <a href="clientes.php" class="btn btn-secondary">Volver a Clientes</a>
     </div>
@@ -136,12 +131,13 @@ try {
                         while ($row = mysqli_fetch_assoc($res_comp)) {
                             $id_comp = intval($row['id'] ?? 0);
                             $label_parts = [];
-                            if (!empty($row['nombre'])) $label_parts[] = $row['nombre'];
-                            elseif (!empty($row['alias'])) $label_parts[] = $row['alias'];
-                            elseif (!empty($row['hostname'])) $label_parts[] = $row['hostname'];
-                            if (!empty($row['ip_address'])) $label_parts[] = '(' . $row['ip_address'] . ')';
+                            $label_parts[] = 'PC-' . str_pad(intval($row['numero_puesto'] ?? $id_comp), 2, '0', STR_PAD_LEFT);
+                            if (!empty($row['nombremarca'])) $label_parts[] = $row['nombremarca'];
+                            if (!empty($row['modelo'])) $label_parts[] = $row['modelo'];
+                            if (!empty($row['codigo_bien_nacional'])) $label_parts[] = '[' . $row['codigo_bien_nacional'] . ']';
+                            if (!empty($row['direccion_ip'])) $label_parts[] = '(' . $row['direccion_ip'] . ')';
 
-                            $label = empty($label_parts) ? ('Equipo #' . $id_comp) : implode(' ', $label_parts);
+                            $label = implode(' ', $label_parts);
                             echo '<option value="' . $id_comp . '">' . htmlspecialchars($label) . '</option>';
                         }
                     } else {
@@ -171,5 +167,3 @@ try {
 </div>
 
 <?php include_once "includes/footer.php"; ?>
-
-<!-- FIN archivo asignar.php -->
