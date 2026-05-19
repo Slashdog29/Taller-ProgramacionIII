@@ -32,8 +32,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'index.php') ? 'active' : ''; ?>" href="index.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
                     <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'clientes.php') ? 'active' : ''; ?>" href="clientes.php"><i class="fas fa-users"></i> Clientes</a></li>
-                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'usuarios.php') ? 'active' : ''; ?>" href="usuarios.php"><i class="fas fa-user-shield"></i> Usuarios</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'sesiones.php') ? 'active' : ''; ?>" href="sesiones.php"><i class="fas fa-clock"></i> Sesiones</a></li>
                     <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'equipos.php') ? 'active' : ''; ?>" href="equipos.php"><i class="fas fa-desktop"></i> Equipos</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'perifericos.php') ? 'active' : ''; ?>" href="perifericos.php"><i class="fas fa-plug"></i> Periféricos</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'usuarios.php') ? 'active' : ''; ?>" href="usuarios.php"><i class="fas fa-user-shield"></i> Usuarios</a></li>
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item dropdown">
