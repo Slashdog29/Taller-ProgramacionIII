@@ -25,18 +25,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($stmt) {
             $stmt->bind_param("s", $usuario);
             $stmt->execute();
-            $res = $stmt->get_result();
+            $stmt->bind_result($user_id, $user_nombre_completo, $user_correo_institucional, $user_password_hash, $user_rol);
+            $stmt->store_result();
 
-            if ($res->num_rows === 1) {
-                $user = $res->fetch_assoc();
-                if (password_verify($clave, $user['password_hash'])) {
+            if ($stmt->num_rows === 1) {
+                $stmt->fetch();
+                if (password_verify($clave, $user_password_hash)) {
                     $_SESSION['active'] = true;
-                    $_SESSION['idUser'] = $user['id'];
-                    $_SESSION['nombre'] = $user['nombre_completo'];
-                    $_SESSION['rol'] = $user['rol'];
-                    $_SESSION['user'] = $user['correo_institucional'];
+                    $_SESSION['id'] = $user_id;
+                    $_SESSION['idUser'] = $user_id;
+                    $_SESSION['id_usuario'] = $user_id;
+                    $_SESSION['usuario_id'] = $user_id;
+                    $_SESSION['nombre'] = $user_nombre_completo;
+                    $_SESSION['rol'] = $user_rol;
+                    $_SESSION['user'] = $user_correo_institucional;
 
-                    $nombre_usuario = $user['nombre_completo'];
+                    $nombre_usuario = $user_nombre_completo;
                     $login_exitoso = true;
 
                     $ip = $_SERVER['REMOTE_ADDR'];
