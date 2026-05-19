@@ -1,5 +1,5 @@
 <?php
-include_once "includes/header.php";
+include_once "includes /header.php";
 require "../conexion.php";
 
 $nombre = $_SESSION['nombre'];
