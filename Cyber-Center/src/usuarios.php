@@ -1,6 +1,6 @@
 <?php
-include_once "includes/header.php";
-require_once "../conexion.php";
+include_once __DIR__ . "/includes/header.php";
+require_once __DIR__ . "/../conexion.php";
 global $conexion;
 
 if (empty($_SESSION['csrf_token'])) {
