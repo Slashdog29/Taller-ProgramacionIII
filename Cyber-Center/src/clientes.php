@@ -4,7 +4,6 @@ require_once __DIR__ . "/../conexion.php";
 
 global $conexion;
 
-// Verificación de seguridad para la conexión
 if (!$conexion) {
     die("<div class='alert alert-danger'>Error crítico: La conexión a la base de datos no está disponible.</div>");
 }
@@ -172,17 +171,24 @@ if ($stmt) {
 }
 
 // Consulta para obtener los clientes con su tipo de rol
-$query = "SELECT c.*, t.nombre_rol, t.tarifa_por_hora 
+$query = "SELECT c.*, COALESCE(t.nombre_rol, 'Sin tipo') AS nombre_rol, COALESCE(t.tarifa_por_hora, 0) AS tarifa_por_hora 
           FROM clientes c 
-          INNER JOIN tipos_cliente t ON c.tipo_cliente_id = t.id 
+          LEFT JOIN tipos_cliente t ON c.tipo_cliente_id = t.id 
           ORDER BY c.id ASC";
 $resultado = mysqli_query($conexion, $query);
 
 $typeQuery = "SELECT id, nombre_rol FROM tipos_cliente ORDER BY nombre_rol ASC";
 $typeResult = mysqli_query($conexion, $typeQuery);
 
+$tiposClientes = [];
+if ($typeResult) {
+    while ($type = mysqli_fetch_assoc($typeResult)) {
+        $tiposClientes[] = $type;
+    }
+}
+
 // Validación de errores en la consulta
-if (!$resultado || !$typeResult) {
+if (!$resultado || $typeResult === false) {
     $errorMessage = mysqli_error($conexion);
     die("<div class='alert alert-danger'>Error en la consulta SQL: " . $errorMessage . "</div>");
 }
@@ -312,7 +318,7 @@ if (!$resultado || !$typeResult) {
                                 <td><code style="color: #00f2ff; font-size: 0.9rem; font-weight: 700;"><?php echo htmlspecialchars($row['cedula_o_codigo']); ?></code></td>
                                 <td>
                                     <span class="badge bg-dark border border-secondary text-info"><?php echo htmlspecialchars($row['nombre_rol']); ?></span>
-                                    <div class="small text-muted mt-1">$<?php echo number_format($row['tarifa_por_hora'], 2); ?>/h</div>
+                                    <div class="small text-muted mt-1">$<?php echo number_format($row['tarifa_por_hora'] ?? 0, 2); ?>/h</div>
                                 </td>
                                 <td><?php echo $row['correo'] ? htmlspecialchars($row['correo']) : '<i class="text-white-50">N/A</i>'; ?></td>
                                 <td>
@@ -384,9 +390,9 @@ if (!$resultado || !$typeResult) {
                         <label class="form-label">Tipo de cliente</label>
                         <select name="tipo_cliente_id" class="form-select" required>
                             <option value="">Selecciona un tipo</option>
-                            <?php while ($type = mysqli_fetch_assoc($typeResult)): ?>
+                            <?php foreach ($tiposClientes as $type): ?>
                                 <option value="<?= htmlspecialchars($type['id']) ?>"><?= htmlspecialchars($type['nombre_rol']) ?></option>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <!-- Campo 'Estado de cuenta' eliminado por solicitud -->
@@ -431,11 +437,9 @@ if (!$resultado || !$typeResult) {
                         <label class="form-label">Tipo de cliente</label>
                         <select name="tipo_cliente_id" id="edit_tipo" class="form-select" required>
                             <option value="">Selecciona un tipo</option>
-                            <?php // Rewind types result for reuse when possible
-                            mysqli_data_seek($typeResult, 0);
-                            while ($type = mysqli_fetch_assoc($typeResult)): ?>
+                            <?php foreach ($tiposClientes as $type): ?>
                                 <option value="<?= htmlspecialchars($type['id']) ?>"><?= htmlspecialchars($type['nombre_rol']) ?></option>
-                            <?php endwhile; ?>
+                            <?php endforeach; ?>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Guardar cambios</button>
