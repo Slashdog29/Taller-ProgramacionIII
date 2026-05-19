@@ -114,7 +114,7 @@ try {
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <h3 class="fw-bold mb-0 text-white">Asignar dispositivo</h3>
-            <p class="text-white-50">Asignación de equipos - Interfaz glass coherente</p>
+            <p class="text-white-50">Asignación de equipos </p>
         </div>
         <a href="clientes.php" class="btn btn-secondary">Volver a Clientes</a>
     </div>
