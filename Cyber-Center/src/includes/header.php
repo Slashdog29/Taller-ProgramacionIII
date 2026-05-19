@@ -1,10 +1,13 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (empty($_SESSION['active'])) {
-    header('location: ../');
+    header('Location: ../');
     exit;
 }
-$nombre_usuario = $_SESSION['nombre'];
+$nombre_usuario = $_SESSION['nombre'] ?? 'Usuario';
+$current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -27,10 +30,10 @@ $nombre_usuario = $_SESSION['nombre'];
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link" href="index.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
-                    <li class="nav-item"><a class="nav-link" href="clientes.php"><i class="fas fa-users"></i> Clientes</a></li>
-                    <li class="nav-item"><a class="nav-link" href="usuarios.php"><i class="fas fa-user-shield"></i> Usuarios</a></li>
-                    <li class="nav-item"><a class="nav-link" href="equipos.php"><i class="fas fa-desktop"></i> Equipos</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'index.php') ? 'active' : ''; ?>" href="index.php"><i class="fas fa-chart-line"></i> Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'clientes.php') ? 'active' : ''; ?>" href="clientes.php"><i class="fas fa-users"></i> Clientes</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'usuarios.php') ? 'active' : ''; ?>" href="usuarios.php"><i class="fas fa-user-shield"></i> Usuarios</a></li>
+                    <li class="nav-item"><a class="nav-link <?php echo ($current_page == 'equipos.php') ? 'active' : ''; ?>" href="equipos.php"><i class="fas fa-desktop"></i> Equipos</a></li>
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item dropdown">
