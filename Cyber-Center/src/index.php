@@ -121,7 +121,7 @@ if ($resAct) {
     <div class="row g-3 mb-4">
         <div class="col-md-6">
             <div class="glass-card chart-container">
-                <h5 class="mb-3"><i class="fas fa-chart-simple"></i> Sesiones por día</h5>
+                <h5 class="mb-3"><i class="fas fa-chart-simple"></i> Sesiones por dia</h5>
                 <canvas id="sessionsChart" style="height: 250px; width: 100%;"></canvas>
             </div>
         </div>
