@@ -8,17 +8,17 @@ require_once __DIR__ . "/../conexion.php"; // $conexion (procedimental)
 
 // -----------------------------------------------------------------------------
 // NOTAS: Ajusta nombres de tablas y columnas según tu esquema.
-// - Tabla de computadoras: 'computadoras' (columnas: id, ip_address, estado_operativo)
-// - Tabla de sesiones: 'sesiones' (columnas: id, id_computadora, estado_transaccion, hora_fin_estimada, hora_fin)
+// - Tabla de computadoras: 'computadoras' (columnas: id, direccion_ip, estado_operativo)
+// - Tabla de sesiones: 'sesiones' (columnas: id, computadora_id, estado_transaccion, hora_fin_estimada, hora_fin)
 // Valores esperados:
-// - estado_operativo: 'disponible' | 'ocupada' | etc.
-// - estado_transaccion: 'en_curso' | 'finalizado'
+// - estado_operativo: 'disponible' | 'ocupado' | 'mantenimiento' | 'desincorporado'
+// - estado_transaccion: 'en_curso' | 'finalizado' | 'anulado'
 // -----------------------------------------------------------------------------
 
 $remote_ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
 // Buscar la computadora por su IP
-$sql_comp = "SELECT id, estado_operativo, nombre FROM computadoras WHERE ip_address = ? LIMIT 1";
+$sql_comp = "SELECT id, estado_operativo, numero_puesto FROM computadoras WHERE direccion_ip = ? LIMIT 1";
 $stmt = mysqli_prepare($conexion, $sql_comp);
 if (!$stmt) {
     echo json_encode(['accion' => 'bloquear', 'motivo' => 'Error interno: fallo al preparar consulta de equipo.']);
@@ -26,7 +26,7 @@ if (!$stmt) {
 }
 mysqli_stmt_bind_param($stmt, 's', $remote_ip);
 mysqli_stmt_execute($stmt);
-mysqli_stmt_bind_result($stmt, $comp_id, $estado_operativo, $comp_nombre);
+mysqli_stmt_bind_result($stmt, $comp_id, $estado_operativo, $numero_puesto);
 $found = mysqli_stmt_fetch($stmt);
 mysqli_stmt_close($stmt);
 
@@ -43,7 +43,7 @@ if (strtolower($estado_operativo) === 'disponible') {
 }
 
 // Buscar sesión activa para esta computadora
-$sql_ses = "SELECT id, id_computadora, hora_fin_estimada FROM sesiones WHERE id_computadora = ? AND estado_transaccion = 'en_curso' ORDER BY id DESC LIMIT 1";
+$sql_ses = "SELECT id, hora_fin_estimada FROM sesiones WHERE computadora_id = ? AND estado_transaccion = 'en_curso' ORDER BY id DESC LIMIT 1";
 $stmt2 = mysqli_prepare($conexion, $sql_ses);
 if (!$stmt2) {
     echo json_encode(['accion' => 'bloquear', 'motivo' => 'Error interno: fallo al preparar consulta de sesión.']);
