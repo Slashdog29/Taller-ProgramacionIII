@@ -62,20 +62,24 @@ if ($resAct) {
 
     <div class="row g-3 mb-4">
         <div class="col-md-3 col-6">
+            <a href="usuarios.php" class="text-decoration-none">
             <div class="glass-card stat-card">
                 <div class="d-flex justify-content-between">
                     <div><div class="stat-title">Usuarios Activos</div><div class="stat-value"><?php echo $totalUsuarios; ?></div><div class="small text-white-50">Con acceso</div></div>
                     <div class="stat-icon"><i class="fas fa-user-shield"></i></div>
                 </div>
             </div>
+            </a>
         </div>
         <div class="col-md-3 col-6">
+            <a href="clientes.php" class="text-decoration-none">
             <div class="glass-card stat-card">
                 <div class="d-flex justify-content-between">
                     <div><div class="stat-title">Clientes Activos</div><div class="stat-value"><?php echo $totalClientes; ?></div><div class="small text-white-50">Habilitados</div></div>
                     <div class="stat-icon"><i class="fas fa-users"></i></div>
                 </div>
             </div>
+            </a>
         </div>
         <div class="col-md-3 col-6">
             <a href="equipos.php" class="text-decoration-none">
@@ -88,12 +92,14 @@ if ($resAct) {
             </a>
         </div>
         <div class="col-md-3 col-6">
+            <a href="sesiones.php" class="text-decoration-none">
             <div class="glass-card stat-card">
                 <div class="d-flex justify-content-between">
                     <div><div class="stat-title">Sesiones Activas</div><div class="stat-value"><?php echo $sesionesActivas; ?></div><div class="small text-white-50">En curso</div></div>
                     <div class="stat-icon"><i class="fas fa-play-circle"></i></div>
                 </div>
             </div>
+            </a>
         </div>
     </div>
 
