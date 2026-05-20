@@ -41,74 +41,73 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Validación antirreingreso
             $sql_check = "SELECT COUNT(*) as cnt FROM sesiones WHERE cliente_id = ? AND DATE(hora_inicio) = CURDATE()";
             $stmt = mysqli_prepare($conexion, $sql_check);
-        if ($stmt) {
-            mysqli_stmt_bind_param($stmt, 'i', $id_cliente);
-            mysqli_stmt_execute($stmt);
-            mysqli_stmt_bind_result($stmt, $cnt);
-            mysqli_stmt_fetch($stmt);
-            mysqli_stmt_close($stmt);
+            if ($stmt) {
+                mysqli_stmt_bind_param($stmt, 'i', $id_cliente);
+                mysqli_stmt_execute($stmt);
+                mysqli_stmt_bind_result($stmt, $cnt);
+                mysqli_stmt_fetch($stmt);
+                mysqli_stmt_close($stmt);
 
-            if ($cnt > 0) {
-                $mensaje = "El cliente ya tiene una sesión registrada hoy. No se permite reingreso.";
-            } else {
-                $check_col_sql = "SHOW COLUMNS FROM sesiones LIKE 'hora_fin_estimada'";
-                $col_exists = false;
-                $res_col = mysqli_query($conexion, $check_col_sql);
-                if ($res_col) {
-                    if (mysqli_num_rows($res_col) > 0) $col_exists = true;
-                    mysqli_free_result($res_col);
-                }
-                if (!$col_exists) {
-                    @mysqli_query($conexion, "ALTER TABLE sesiones ADD COLUMN hora_fin_estimada TIMESTAMP NULL DEFAULT NULL AFTER hora_inicio");
-                }
-
-                if ($usuario_operador_id <= 0) {
-                    $usuario_operador_id = 1;
-                }
-                // Obtener tarifa del tipo de cliente (si existe)
-                $tarifa = 0.00;
-                $tipoSql = "SELECT COALESCE(t.tarifa_por_hora,0) AS tarifa, COALESCE(t.exento_pago,0) AS exento
-                            FROM clientes c
-                            LEFT JOIN tipos_cliente t ON c.tipo_cliente_id = t.id
-                            WHERE c.id = ? LIMIT 1";
-                $tipoStmt = mysqli_prepare($conexion, $tipoSql);
-                if ($tipoStmt) {
-                    mysqli_stmt_bind_param($tipoStmt, 'i', $id_cliente);
-                    mysqli_stmt_execute($tipoStmt);
-                    mysqli_stmt_bind_result($tipoStmt, $tarifa_val, $exento_val);
-                    if (mysqli_stmt_fetch($tipoStmt)) {
-                        $tarifa = floatval($tarifa_val);
-                        if (intval($exento_val) === 1) $tarifa = 0.00;
-                    }
-                    mysqli_stmt_close($tipoStmt);
-                }
-
-                $sql_insert = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, 'en_curso')";
-                $stmt2 = mysqli_prepare($conexion, $sql_insert);
-                if ($stmt2) {
-                    mysqli_stmt_bind_param($stmt2, 'iiiid', $id_cliente, $id_computadora, $usuario_operador_id, $minutos, $tarifa);
-                    $ok = mysqli_stmt_execute($stmt2);
-                    if ($ok) {
-    
-                        $sql_up = "UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = ?";
-                        $stmt_up = mysqli_prepare($conexion, $sql_up);
-                        if ($stmt_up) {
-                            mysqli_stmt_bind_param($stmt_up, 'i', $id_computadora);
-                            mysqli_stmt_execute($stmt_up);
-                            mysqli_stmt_close($stmt_up);
-                        }
-
-                        $mensaje = "Asignación completada correctamente.";
-                    } else {
-                        $mensaje = "Error al insertar la sesión: " . mysqli_error($conexion);
-                    }
-                    mysqli_stmt_close($stmt2);
+                if ($cnt > 0) {
+                    $mensaje = "El cliente ya tiene una sesión registrada hoy. No se permite reingreso.";
                 } else {
-                    $mensaje = "Error al preparar la inserción: " . mysqli_error($conexion);
+                    $check_col_sql = "SHOW COLUMNS FROM sesiones LIKE 'hora_fin_estimada'";
+                    $col_exists = false;
+                    $res_col = mysqli_query($conexion, $check_col_sql);
+                    if ($res_col) {
+                        if (mysqli_num_rows($res_col) > 0) $col_exists = true;
+                        mysqli_free_result($res_col);
+                    }
+                    if (!$col_exists) {
+                        @mysqli_query($conexion, "ALTER TABLE sesiones ADD COLUMN hora_fin_estimada TIMESTAMP NULL DEFAULT NULL AFTER hora_inicio");
+                    }
+
+                    if ($usuario_operador_id <= 0) {
+                        $usuario_operador_id = 1;
+                    }
+                    // Obtener tarifa del tipo de cliente (si existe)
+                    $tarifa = 0.00;
+                    $tipoSql = "SELECT COALESCE(t.tarifa_por_hora,0) AS tarifa, COALESCE(t.exento_pago,0) AS exento
+                                FROM clientes c
+                                LEFT JOIN tipos_cliente t ON c.tipo_cliente_id = t.id
+                                WHERE c.id = ? LIMIT 1";
+                    $tipoStmt = mysqli_prepare($conexion, $tipoSql);
+                    if ($tipoStmt) {
+                        mysqli_stmt_bind_param($tipoStmt, 'i', $id_cliente);
+                        mysqli_stmt_execute($tipoStmt);
+                        mysqli_stmt_bind_result($tipoStmt, $tarifa_val, $exento_val);
+                        if (mysqli_stmt_fetch($tipoStmt)) {
+                            $tarifa = floatval($tarifa_val);
+                            if (intval($exento_val) === 1) $tarifa = 0.00;
+                        }
+                        mysqli_stmt_close($tipoStmt);
+                    }
+
+                    $sql_insert = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion) VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, 'en_curso')";
+                    $stmt2 = mysqli_prepare($conexion, $sql_insert);
+                    if ($stmt2) {
+                        mysqli_stmt_bind_param($stmt2, 'iiiid', $id_cliente, $id_computadora, $usuario_operador_id, $minutos, $tarifa);
+                        $ok = mysqli_stmt_execute($stmt2);
+                        if ($ok) {
+                            $sql_up = "UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = ?";
+                            $stmt_up = mysqli_prepare($conexion, $sql_up);
+                            if ($stmt_up) {
+                                mysqli_stmt_bind_param($stmt_up, 'i', $id_computadora);
+                                mysqli_stmt_execute($stmt_up);
+                                mysqli_stmt_close($stmt_up);
+                            }
+                            $mensaje = "Asignación completada correctamente.";
+                        } else {
+                            $mensaje = "Error al insertar la sesión: " . mysqli_error($conexion);
+                        }
+                        mysqli_stmt_close($stmt2);
+                    } else {
+                        $mensaje = "Error al preparar la inserción: " . mysqli_error($conexion);
+                    }
                 }
+            } else {
+                $mensaje = "Error al preparar la verificación: " . mysqli_error($conexion);
             }
-        } else {
-            $mensaje = "Error al preparar la verificación: " . mysqli_error($conexion);
         }
     }
 }
