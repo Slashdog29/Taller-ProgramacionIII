@@ -145,7 +145,7 @@ if ($res_comp === false) {
                     }
                     ?>
                 </select>
-                <div class="form-text">Si no aparecen equipos, verifica el campo <strong>estado_operativo</strong> en la tabla de computadoras.</div>
+                <div class="form-text text-white">Si no aparecen equipos, verifica el campo <strong>estado_operativo</strong> en la tabla de computadoras.</div>
             </div>
 
             <div class="col-md-4">
@@ -156,7 +156,7 @@ if ($res_comp === false) {
                         <option value="<?php echo $m; ?>"><?php echo $m; ?> minutos</option>
                     <?php endfor; ?>
                 </select>
-                <div class="form-text">Los bloques incrementan de 15 en 15 hasta 240 minutos (4 horas).</div>
+                <div class="form-text text-white">Los bloques incrementan de 15 en 15 hasta 240 minutos (4 horas).</div>
             </div>
 
             <div class="col-md-2 d-flex align-items-end">
