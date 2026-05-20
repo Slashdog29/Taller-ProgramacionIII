@@ -267,7 +267,7 @@ if ($res_p) {
                     <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                     <div class="mb-3">
                         <label class="form-label">Nombre/Etiqueta</label>
-                        <input type="text" name="nombre" class="form-control" placeholder="Ej: Estación 01" required>
+                        <input type="text"  name="nombre" class="form-control" placeholder="Ej: Estación 01" required>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Dirección IP</label>

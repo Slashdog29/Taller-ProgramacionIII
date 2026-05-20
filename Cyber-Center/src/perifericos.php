@@ -495,9 +495,6 @@ if ($result_bienes) {
                                         <button type="button" class="btn btn-sm btn-outline-light rounded-pill me-2 edit-peripheral" data-id="<?php echo htmlspecialchars($bien['id']); ?>">
                                             <i class="fas fa-edit"></i>
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-primary rounded-pill me-2 assign-peripheral" data-id="<?php echo htmlspecialchars($bien['id']); ?>">
-                                            <i class="fas fa-desktop"></i>
-                                        </button>
                                         <button type="button" class="btn btn-sm btn-outline-warning rounded-pill me-2 damage-peripheral" data-id="<?php echo htmlspecialchars($bien['id']); ?>">
                                             <i class="fas fa-tools"></i>
                                         </button>
@@ -579,7 +576,6 @@ if ($result_bienes) {
                             <option value="excelente">Excelente</option>
                             <option value="bueno">Bueno</option>
                             <option value="regular">Regular</option>
-                            <option value="dañado">Dañado</option>
                         </select>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Guardar estado</button>
@@ -589,35 +585,6 @@ if ($result_bienes) {
     </div>
 </div>
 
-<!-- Modal Asignar periférico -->
-<div class="modal fade" id="modalAsignarPeriferico" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass-modal">
-            <div class="modal-header">
-                <h5 class="modal-title">Asignar Periférico</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="formAsignarPeriferico">
-                    <input type="hidden" name="action" value="assign">
-                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token_csrf); ?>">
-                    <input type="hidden" name="id_bien" value="">
-
-                    <div class="mb-3">
-                        <label class="form-label">Seleccionar computadora (puesto)</label>
-                        <select name="id_computadora" class="form-select" required>
-                            <option value="">Seleccione puesto</option>
-                            <?php foreach ($computadoras as $c): ?>
-                                <option value="<?php echo htmlspecialchars($c['id']); ?>"><?php echo htmlspecialchars($c['numero_puesto']); ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Asignar</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -654,24 +621,6 @@ if ($result_bienes) {
             fd.append('estado_bien', formEditar.querySelector('select[name="estado_bien"]').value);
             fd.append('csrf_token', csrfToken);
             try { await postForm(fd); } catch (err) { showError('No se pudo actualizar el estado del periférico.'); }
-        });
-
-        // Asignar: abrir modal y preparar id
-        document.querySelectorAll('.assign-peripheral').forEach(btn => {
-            btn.addEventListener('click', function() {
-                const id = this.dataset.id;
-                const modal = document.getElementById('modalAsignarPeriferico');
-                modal.querySelector('input[name="id_bien"]').value = id;
-                new bootstrap.Modal(modal).show();
-            });
-        });
-
-        // Envío formulario Asignar
-        const formAsignar = document.getElementById('formAsignarPeriferico');
-        formAsignar.addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const fd = new FormData(formAsignar);
-            try { await postForm(fd); } catch (err) { showError('No se pudo asignar el periférico.'); }
         });
 
         // Acción rápida: marcar como descompuesto
