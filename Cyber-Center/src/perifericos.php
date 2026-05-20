@@ -33,17 +33,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
     // ACTION: Crear nuevo periférico
     if ($action === 'create') {
         $tipo_periferico = intval($_POST['tipo_periferico'] ?? 0);
-        $codigo_bien_nacional = trim($_POST['codigo_bien_nacional'] ?? '');
+        // NOTE: código de bien ahora se genera automáticamente en servidor, no se toma del POST
+        $codigo_bien_nacional = '';
         $numero_serial_fabrica = trim($_POST['numero_serial_fabrica'] ?? '');
         $marca = trim($_POST['marca'] ?? '');
         $modelo = trim($_POST['modelo'] ?? '');
         $color = trim($_POST['color'] ?? '');
 
-        if ($tipo_periferico <= 0 || empty($codigo_bien_nacional) || empty($numero_serial_fabrica) || empty($marca) || empty($modelo) || empty($color)) {
-            $response['message'] = 'Todos los campos son obligatorios.';
+        // Validar campos requeridos (excepto el código que se genera automáticamente)
+        if ($tipo_periferico <= 0 || empty($numero_serial_fabrica) || empty($marca) || empty($modelo) || empty($color)) {
+            $response['message'] = 'Todos los campos obligatorios deben completarse.';
             echo json_encode($response);
             exit;
         }
+
+        // === Generación automática de 'codigo_bien_nacional' ===
+        // 1) Obtener el nombre del tipo seleccionado para formar el prefijo (primeras 3 letras en mayúsculas)
+        // 2) Contar cuántos registros del mismo tipo existen en la tabla 'perifericos' (correlativo)
+        // 3) Formatear el número a 3 dígitos con ceros a la izquierda
+        // 4) Concatenar en el formato exacto: BIEN-[PREFIJO]-[NNN]
+
+        $prefijo = 'PER'; // valor por defecto si no se encuentra el tipo
+        $siguiente_numero = 1;
+
+        $sql_tipo = "SELECT nombre_componente FROM tipos_periferico WHERE id = ? LIMIT 1";
+        $stmt_t = mysqli_prepare($conexion, $sql_tipo);
+        if ($stmt_t) {
+            mysqli_stmt_bind_param($stmt_t, 'i', $tipo_periferico);
+            mysqli_stmt_execute($stmt_t);
+            $res_t = mysqli_stmt_get_result($stmt_t);
+            if ($res_t && $row_t = mysqli_fetch_assoc($res_t)) {
+                $prefijo = strtoupper(substr($row_t['nombre_componente'] ?? 'PER', 0, 3));
+            }
+            mysqli_stmt_close($stmt_t);
+        }
+
+        $sql_count = "SELECT COUNT(*) AS total FROM perifericos WHERE tipo_periferico_id = ?";
+        $stmt_c = mysqli_prepare($conexion, $sql_count);
+        if ($stmt_c) {
+            mysqli_stmt_bind_param($stmt_c, 'i', $tipo_periferico);
+            mysqli_stmt_execute($stmt_c);
+            $res_c = mysqli_stmt_get_result($stmt_c);
+            if ($res_c && $row_c = mysqli_fetch_assoc($res_c)) {
+                $siguiente_numero = intval($row_c['total']) + 1;
+            }
+            mysqli_stmt_close($stmt_c);
+        }
+
+        $numero_formateado = str_pad($siguiente_numero, 3, '0', STR_PAD_LEFT);
+        $codigo_bien_nacional = "BIEN-" . $prefijo . "-" . $numero_formateado;
+
+        // ======================================================
 
         $query = "INSERT INTO perifericos (tipo_periferico_id, codigo_bien_nacional, numero_serial_fabrica, marca, modelo, color) VALUES (?, ?, ?, ?, ?, ?)";
         $stmt = mysqli_prepare($conexion, $query);
@@ -493,11 +533,9 @@ if ($result_bienes) {
                                 <option value="<?php echo htmlspecialchars($tipo['id']); ?>"><?php echo htmlspecialchars($tipo['nombre_componente']); ?></option>
                             <?php endforeach; ?>
                         </select>
+                        <div class="form-text text-white">El código de inventario (Ej: BIEN-MON-001) se asignará automáticamente al guardar según la categoría.</div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Código bien nacional</label>
-                        <input type="text" name="codigo_bien_nacional" class="form-control" required>
-                    </div>
+                    <!-- El campo 'Código bien nacional' fue eliminado del formulario porque ahora se genera en el servidor. -->
                     <div class="mb-3">
                         <label class="form-label">Número serial fábrica</label>
                         <input type="text" name="numero_serial_fabrica" class="form-control" required>
