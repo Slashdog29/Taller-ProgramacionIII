@@ -18,9 +18,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($id_cliente <= 0 || $id_computadora <= 0 || $minutos <= 0) {
         $mensaje = "Error: datos incompletos o inválidos.";
     } else {
-        // Validación antirreingreso
-        $sql_check = "SELECT COUNT(*) as cnt FROM sesiones WHERE cliente_id = ? AND DATE(hora_inicio) = CURDATE()";
-        $stmt = mysqli_prepare($conexion, $sql_check);
+        // Verificar si el cliente está suspendido
+        $sql_estado_cliente = "SELECT estado_cuenta FROM clientes WHERE id = ? LIMIT 1";
+        $estadoStmt = mysqli_prepare($conexion, $sql_estado_cliente);
+        if ($estadoStmt) {
+            mysqli_stmt_bind_param($estadoStmt, 'i', $id_cliente);
+            mysqli_stmt_execute($estadoStmt);
+            mysqli_stmt_bind_result($estadoStmt, $estado_cuenta);
+            if (mysqli_stmt_fetch($estadoStmt)) {
+                if ($estado_cuenta === 'suspendido') {
+                    $mensaje = "El cliente está suspendido y no puede usar las máquinas.";
+                }
+            } else {
+                $mensaje = "Cliente no encontrado.";
+            }
+            mysqli_stmt_close($estadoStmt);
+        } else {
+            $mensaje = "Error al verificar el estado del cliente: " . mysqli_error($conexion);
+        }
+
+        if (empty($mensaje)) {
+            // Validación antirreingreso
+            $sql_check = "SELECT COUNT(*) as cnt FROM sesiones WHERE cliente_id = ? AND DATE(hora_inicio) = CURDATE()";
+            $stmt = mysqli_prepare($conexion, $sql_check);
         if ($stmt) {
             mysqli_stmt_bind_param($stmt, 'i', $id_cliente);
             mysqli_stmt_execute($stmt);
