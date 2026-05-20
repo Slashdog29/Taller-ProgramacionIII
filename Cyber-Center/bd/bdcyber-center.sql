@@ -271,33 +271,33 @@ INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `nume
 
 -- Periféricos (referencian computadoras existentes)
 INSERT INTO `perifericos` (`computadora_id`, `tipo_periferico_id`, `codigo_bien_nacional`, `numero_serial_fabrica`, `marca`, `modelo`, `color`, `estado_fisico`) VALUES
-(1, 1, 'BIEN-MON-001', 'SN-MON-001', 'Dell', 'E2420H', 'Negro', 'excelente'),
-(1, 2, 'BIEN-TEC-001', 'SN-TEC-001', 'Logitech', 'K120', 'Negro', 'bueno'),
-(1, 3, 'BIEN-MOU-001', 'SN-MOU-001', 'Logitech', 'M90', 'Negro', 'bueno'),
-(2, 1, 'BIEN-MON-002', 'SN-MON-002', 'Lenovo', 'ThinkVision T24i', 'Negro', 'excelente'),
-(2, 2, 'BIEN-TEC-002', 'SN-TEC-002', 'Lenovo', 'Essential', 'Negro', 'excelente'),
-(2, 3, 'BIEN-MOU-002', 'SN-MOU-002', 'Lenovo', 'Essential Mouse', 'Negro', 'excelente'),
-(2, 6, 'BIEN-UPS-002', 'SN-UPS-002', 'APC', 'Easy UPS 650VA', 'Negro', 'bueno'),
-(3, 1, 'BIEN-MON-003', 'SN-MON-003', 'HP', 'P24h G4', 'Negro', 'excelente'),
-(3, 2, 'BIEN-TEC-003', 'SN-TEC-003', 'HP', 'Pavilion 300', 'Negro', 'bueno'),
-(3, 3, 'BIEN-MOU-003', 'SN-MOU-003', 'HP', 'Pavilion 300 M', 'Negro', 'bueno'),
-(4, 1, 'BIEN-MON-004', 'SN-MON-004', 'Samsung', 'T35F', 'Negro', 'bueno'),
-(4, 4, 'BIEN-AUD-004', 'SN-AUD-004', 'Sony', 'WH-CH510', 'Azul', 'regular'),
-(5, 1, 'BIEN-MON-005', 'SN-MON-005', 'Asus', 'VP228HE', 'Negro', 'excelente'),
-(5, 2, 'BIEN-TEC-005', 'SN-TEC-005', 'Razer', 'Cynosa V2', 'Negro', 'excelente'),
-(5, 3, 'BIEN-MOU-005', 'SN-MOU-005', 'Razer', 'DeathAdder Essential', 'Negro', 'excelente'),
-(5, 5, 'BIEN-CAM-005', 'SN-CAM-005', 'Logitech', 'C920 HD Pro', 'Negro', 'excelente');
+(1, 10, 'BIEN-MON-001', 'SN-MON-001', 'Dell', 'E2420H', 'Negro', 'excelente'),
+(1, 11, 'BIEN-TEC-001', 'SN-TEC-001', 'Logitech', 'K120', 'Negro', 'bueno'),
+(1, 7, 'BIEN-MOU-001', 'SN-MOU-001', 'Logitech', 'M90', 'Negro', 'bueno'),
+(2, 9, 'BIEN-MON-002', 'SN-MON-002', 'Lenovo', 'ThinkVision T24i', 'Negro', 'excelente'),
+(2, 8, 'BIEN-TEC-002', 'SN-TEC-002', 'Lenovo', 'Essential', 'Negro', 'excelente'),
+(2, 12, 'BIEN-MOU-002', 'SN-MOU-002', 'Lenovo', 'Essential Mouse', 'Negro', 'excelente'),
+(2, 11, 'BIEN-UPS-002', 'SN-UPS-002', 'APC', 'Easy UPS 650VA', 'Negro', 'bueno'),
+(3, 12, 'BIEN-MON-003', 'SN-MON-003', 'HP', 'P24h G4', 'Negro', 'excelente'),
+(3, 9, 'BIEN-TEC-003', 'SN-TEC-003', 'HP', 'Pavilion 300', 'Negro', 'bueno'),
+(3, 7, 'BIEN-MOU-003', 'SN-MOU-003', 'HP', 'Pavilion 300 M', 'Negro', 'bueno'),
+(4, 7, 'BIEN-MON-004', 'SN-MON-004', 'Samsung', 'T35F', 'Negro', 'bueno'),
+(4, 12, 'BIEN-AUD-004', 'SN-AUD-004', 'Sony', 'WH-CH510', 'Azul', 'regular'),
+(5, 10, 'BIEN-MON-005', 'SN-MON-005', 'Asus', 'VP228HE', 'Negro', 'excelente'),
+(5, 9, 'BIEN-TEC-005', 'SN-TEC-005', 'Razer', 'Cynosa V2', 'Negro', 'excelente'),
+(5, 8, 'BIEN-MOU-005', 'SN-MOU-005', 'Razer', 'DeathAdder Essential', 'Negro', 'excelente'),
+(5, 10, 'BIEN-CAM-005', 'SN-CAM-005', 'Logitech', 'C920 HD Pro', 'Negro', 'excelente');
 
 -- Clientes
 INSERT INTO `clientes` (`id`, `tipo_cliente_id`, `cedula_o_codigo`, `nombre`, `apellido`, `correo`, `estado_cuenta`) VALUES
-(1, 2, 'V-12345678', 'Juan', 'Pérez', 'juan@estudiante.edu', 'activo'),
-(2, 1, 'V-20111222', 'Carlos', 'Mendoza', 'carlos.mendoza@gmail.com', 'activo'),
-(3, 2, 'V-25333444', 'María', 'Rodríguez', 'maria.rodriguez@estudiante.edu', 'activo'),
-(4, 2, 'V-27555666', 'Alejandro', 'Gómez', 'alejandro.gomez@estudiante.edu', 'activo'),
-(5, 3, 'V-15888999', 'Roberto', 'Lovera', 'roberto.lovera@profesor.edu', 'activo'),
-(6, 4, 'V-18222333', 'Ana', 'Castillo', 'ana.castillo@administrativo.edu', 'activo'),
-(7, 2, 'V-29444555', 'Luis', 'Sánchez', 'luis.sanchez@estudiante.edu', 'suspendido'),
-(8, 1, 'V-30666777', 'Gabriela', 'Torres', NULL, 'activo');
+(1, 6, 'V-12345678', 'Juan', 'Pérez', 'juan@estudiante.edu', 'activo'),
+(2, 7, 'V-20111222', 'Carlos', 'Mendoza', 'carlos.mendoza@gmail.com', 'activo'),
+(3, 6, 'V-25333444', 'María', 'Rodríguez', 'maria.rodriguez@estudiante.edu', 'activo'),
+(4, 8, 'V-27555666', 'Alejandro', 'Gómez', 'alejandro.gomez@estudiante.edu', 'activo'),
+(5, 6, 'V-15888999', 'Roberto', 'Lovera', 'roberto.lovera@profesor.edu', 'activo'),
+(6, 8, 'V-18222333', 'Ana', 'Castillo', 'ana.castillo@administrativo.edu', 'activo'),
+(7, 7, 'V-29444555', 'Luis', 'Sánchez', 'luis.sanchez@estudiante.edu', 'suspendido'),
+(8, 6, 'V-30666777', 'Gabriela', 'Torres', NULL, 'activo');
 
 -- Sesiones
 INSERT INTO `sesiones` (`id`, `computadora_id`, `cliente_id`, `usuario_operador_id`, `hora_inicio`, `hora_fin`, `monto_tarifa_aplicada`, `monto_total_pagado`, `comprobante_factura`, `estado_transaccion`) VALUES
