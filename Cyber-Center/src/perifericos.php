@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
 
     $action = $_POST['action'] ?? '';
 
+    // ACTION: Crear nuevo periférico
     if ($action === 'create') {
         $tipo_periferico = intval($_POST['tipo_periferico'] ?? 0);
         $codigo_bien_nacional = trim($_POST['codigo_bien_nacional'] ?? '');
@@ -44,7 +45,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             exit;
         }
 
-        // Inserción en tabla perifericos según el esquema real
         $query = "INSERT INTO perifericos (tipo_periferico_id, codigo_bien_nacional, numero_serial_fabrica, marca, modelo, color) VALUES (?, ?, ?, ?, ?, ?)";
         $stmt = mysqli_prepare($conexion, $query);
 
@@ -79,6 +79,197 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
 
         mysqli_stmt_close($stmt);
+
+    // ACTION: Update (Editar) - SOLO actualiza el estado del periférico
+    } elseif ($action === 'update') {
+        $id_bien = intval($_POST['id_bien'] ?? 0);
+        $estado_bien = trim($_POST['estado_bien'] ?? '');
+
+        if ($id_bien <= 0 || empty($estado_bien)) {
+            $response['message'] = 'Datos insuficientes para actualizar estado.';
+            echo json_encode($response);
+            exit;
+        }
+
+        // obtener nombre para historial
+        $nombre = '';
+        $rq = mysqli_prepare($conexion, "SELECT modelo FROM perifericos WHERE id = ? LIMIT 1");
+        if ($rq) {
+            mysqli_stmt_bind_param($rq, 'i', $id_bien);
+            mysqli_stmt_execute($rq);
+            $rr = mysqli_stmt_get_result($rq);
+            if ($rr && $row = mysqli_fetch_assoc($rr)) $nombre = $row['modelo'];
+            mysqli_stmt_close($rq);
+        }
+
+        $update_q = "UPDATE perifericos SET estado_fisico = ? WHERE id = ?";
+        $stmt_up = mysqli_prepare($conexion, $update_q);
+        if ($stmt_up) {
+            mysqli_stmt_bind_param($stmt_up, 'si', $estado_bien, $id_bien);
+            $ok = mysqli_stmt_execute($stmt_up);
+
+            if ($ok) {
+                $usuario = $_SESSION['nombre'] ?? 'Sistema';
+                $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+                $fyh = date('Y-m-d H:i:s');
+                $sector = 'Periféricos';
+                $acciones = "Cambió estado del periférico $nombre a $estado_bien";
+                $hist_q = "INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)";
+                $s = mysqli_prepare($conexion, $hist_q);
+                if ($s) {
+                    mysqli_stmt_bind_param($s, 'sssss', $usuario, $ip, $fyh, $sector, $acciones);
+                    mysqli_stmt_execute($s);
+                    mysqli_stmt_close($s);
+                }
+
+                $response['success'] = true;
+                $response['message'] = 'Estado actualizado.';
+            } else {
+                $response['message'] = 'Error al actualizar estado: ' . mysqli_stmt_error($stmt_up);
+            }
+            mysqli_stmt_close($stmt_up);
+        } else {
+            $response['message'] = 'Error al preparar actualización: ' . mysqli_error($conexion);
+        }
+
+    // ACTION: Assign (Asignar) - vincula periférico a una computadora (computadora_id)
+    } elseif ($action === 'assign') {
+        $id_bien = intval($_POST['id_bien'] ?? 0);
+        $id_computadora = intval($_POST['id_computadora'] ?? 0);
+
+        if ($id_bien <= 0 || $id_computadora <= 0) {
+            $response['message'] = 'Datos insuficientes para asignar.';
+            echo json_encode($response);
+            exit;
+        }
+
+        // Actualizar columna computadora_id en perifericos
+        $upd = "UPDATE perifericos SET computadora_id = ? WHERE id = ?";
+        $s_up = mysqli_prepare($conexion, $upd);
+        if ($s_up) {
+            mysqli_stmt_bind_param($s_up, 'ii', $id_computadora, $id_bien);
+            $ok = mysqli_stmt_execute($s_up);
+            if ($ok) {
+                // obtener numero_puesto para el mensaje
+                $pq = mysqli_prepare($conexion, "SELECT numero_puesto FROM computadoras WHERE id = ? LIMIT 1");
+                $puesto = $id_computadora;
+                if ($pq) {
+                    mysqli_stmt_bind_param($pq, 'i', $id_computadora);
+                    mysqli_stmt_execute($pq);
+                    $res_pq = mysqli_stmt_get_result($pq);
+                    if ($res_pq && $rowp = mysqli_fetch_assoc($res_pq)) {
+                        $puesto = $rowp['numero_puesto'];
+                    }
+                    mysqli_stmt_close($pq);
+                }
+
+                $usuario = $_SESSION['nombre'] ?? 'Sistema';
+                $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+                $fyh = date('Y-m-d H:i:s');
+                $sector = 'Periféricos';
+                $acciones = "Asignó el periférico al puesto $puesto";
+                $hist_q = "INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)";
+                $s = mysqli_prepare($conexion, $hist_q);
+                if ($s) {
+                    mysqli_stmt_bind_param($s, 'sssss', $usuario, $ip, $fyh, $sector, $acciones);
+                    mysqli_stmt_execute($s);
+                    mysqli_stmt_close($s);
+                }
+
+                $response['success'] = true;
+                $response['message'] = 'Periférico asignado.';
+            } else {
+                $response['message'] = 'Error al asignar: ' . mysqli_stmt_error($s_up);
+            }
+            mysqli_stmt_close($s_up);
+        } else {
+            $response['message'] = 'Error al preparar asignación: ' . mysqli_error($conexion);
+        }
+
+    // ACTION: set_damaged (Marcar como dañado)
+    } elseif ($action === 'set_damaged') {
+        $id_bien = intval($_POST['id_bien'] ?? 0);
+        if ($id_bien <= 0) {
+            $response['message'] = 'ID inválido.';
+            echo json_encode($response);
+            exit;
+        }
+
+        // obtener nombre para historial
+        $nombre = '';
+        $rq = mysqli_prepare($conexion, "SELECT modelo FROM perifericos WHERE id = ? LIMIT 1");
+        if ($rq) {
+            mysqli_stmt_bind_param($rq, 'i', $id_bien);
+            mysqli_stmt_execute($rq);
+            $rr = mysqli_stmt_get_result($rq);
+            if ($rr && $row = mysqli_fetch_assoc($rr)) $nombre = $row['modelo'];
+            mysqli_stmt_close($rq);
+        }
+
+        $upd = mysqli_prepare($conexion, "UPDATE perifericos SET estado_fisico = 'dañado' WHERE id = ?");
+        if ($upd) {
+            mysqli_stmt_bind_param($upd, 'i', $id_bien);
+            $ok = mysqli_stmt_execute($upd);
+            if ($ok) {
+                $usuario = $_SESSION['nombre'] ?? 'Sistema';
+                $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+                $fyh = date('Y-m-d H:i:s');
+                $sector = 'Periféricos';
+                $acciones = "Marcó el periférico $nombre como descompuesto";
+                $hist_q = "INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)";
+                $s = mysqli_prepare($conexion, $hist_q);
+                if ($s) {
+                    mysqli_stmt_bind_param($s, 'sssss', $usuario, $ip, $fyh, $sector, $acciones);
+                    mysqli_stmt_execute($s);
+                    mysqli_stmt_close($s);
+                }
+                $response['success'] = true;
+                $response['message'] = 'Periférico marcado como descompuesto.';
+            } else {
+                $response['message'] = 'Error al marcar como descompuesto: ' . mysqli_stmt_error($upd);
+            }
+            mysqli_stmt_close($upd);
+        } else {
+            $response['message'] = 'Error al preparar la petición: ' . mysqli_error($conexion);
+        }
+
+    // ACTION: disable (baja lógica)
+    } elseif ($action === 'disable') {
+        $id_bien = intval($_POST['id_bien'] ?? 0);
+        if ($id_bien <= 0) {
+            $response['message'] = 'ID inválido.';
+            echo json_encode($response);
+            exit;
+        }
+
+        // Realizamos una baja lógica: desvincular de computadora y marcar como 'dañado' (no eliminar físicamente)
+        $upd = mysqli_prepare($conexion, "UPDATE perifericos SET computadora_id = NULL, estado_fisico = 'dañado' WHERE id = ?");
+        if ($upd) {
+            mysqli_stmt_bind_param($upd, 'i', $id_bien);
+            $ok = mysqli_stmt_execute($upd);
+            if ($ok) {
+                $usuario = $_SESSION['nombre'] ?? 'Sistema';
+                $ip = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+                $fyh = date('Y-m-d H:i:s');
+                $sector = 'Periféricos';
+                $acciones = "Dio de baja el periférico del sistema";
+                $hist_q = "INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)";
+                $s = mysqli_prepare($conexion, $hist_q);
+                if ($s) {
+                    mysqli_stmt_bind_param($s, 'sssss', $usuario, $ip, $fyh, $sector, $acciones);
+                    mysqli_stmt_execute($s);
+                    mysqli_stmt_close($s);
+                }
+                $response['success'] = true;
+                $response['message'] = 'Periférico dado de baja (lógica).';
+            } else {
+                $response['message'] = 'Error al dar de baja: ' . mysqli_stmt_error($upd);
+            }
+            mysqli_stmt_close($upd);
+        } else {
+            $response['message'] = 'Error al preparar la petición: ' . mysqli_error($conexion);
+        }
+
     } else {
         $response['message'] = 'Acción no reconocida.';
     }
@@ -98,6 +289,15 @@ $result_tipos = mysqli_query($conexion, "SELECT id, nombre_componente FROM tipos
 if ($result_tipos) {
     while ($row = mysqli_fetch_assoc($result_tipos)) {
         $tipos_periferico[] = $row;
+    }
+}
+
+// Consulta para computadoras (usada en modal Asignar)
+$computadoras = [];
+$res_comp = mysqli_query($conexion, "SELECT id, numero_puesto FROM computadoras ORDER BY numero_puesto ASC");
+if ($res_comp) {
+    while ($r = mysqli_fetch_assoc($res_comp)) {
+        $computadoras[] = $r;
     }
 }
 
@@ -261,9 +461,6 @@ if ($result_bienes) {
                                         <button type="button" class="btn btn-sm btn-outline-warning rounded-pill me-2 damage-peripheral" data-id="<?php echo htmlspecialchars($bien['id']); ?>">
                                             <i class="fas fa-tools"></i>
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill delete-peripheral" data-id="<?php echo htmlspecialchars($bien['id']); ?>">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -324,53 +521,157 @@ if ($result_bienes) {
     </div>
 </div>
 
+<!-- Modal Editar periférico (solo estado) -->
+<div class="modal fade" id="modalEditarPeriferico" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title">Cambiar Estado</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formEditarPeriferico">
+                    <input type="hidden" name="action" value="update">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token_csrf); ?>">
+                    <input type="hidden" name="id_bien" value="">
+
+                    <div class="mb-3">
+                        <label class="form-label">Estado</label>
+                        <select name="estado_bien" class="form-select" required>
+                            <option value="excelente">Excelente</option>
+                            <option value="bueno">Bueno</option>
+                            <option value="regular">Regular</option>
+                            <option value="dañado">Dañado</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Guardar estado</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Asignar periférico -->
+<div class="modal fade" id="modalAsignarPeriferico" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title">Asignar Periférico</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="formAsignarPeriferico">
+                    <input type="hidden" name="action" value="assign">
+                    <input type="hidden" name="csrf_token" value="<?php echo htmlspecialchars($token_csrf); ?>">
+                    <input type="hidden" name="id_bien" value="">
+
+                    <div class="mb-3">
+                        <label class="form-label">Seleccionar computadora (puesto)</label>
+                        <select name="id_computadora" class="form-select" required>
+                            <option value="">Seleccione puesto</option>
+                            <?php foreach ($computadoras as $c): ?>
+                                <option value="<?php echo htmlspecialchars($c['id']); ?>"><?php echo htmlspecialchars($c['numero_puesto']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Asignar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const formPeriferico = document.getElementById('formPeriferico');
+        const csrfToken = '<?php echo htmlspecialchars($token_csrf); ?>';
 
+        // Crear periférico (form existente)
+        const formPeriferico = document.getElementById('formPeriferico');
         formPeriferico.addEventListener('submit', async function(event) {
             event.preventDefault();
-
             const formData = new FormData(formPeriferico);
-
-            try {
-                const response = await fetch('perifericos.php', {
-                    method: 'POST',
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest'
-                    },
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (data.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Registrado',
-                        text: data.message,
-                        timer: 1500,
-                        timerProgressBar: true,
-                        showConfirmButton: false
-                    });
-                    setTimeout(() => {
-                        location.reload();
-                    }, 1500);
-                } else {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error',
-                        text: data.message || 'No se pudo guardar el periférico.'
-                    });
-                }
-            } catch (error) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de red',
-                    text: 'No se pudo conectar con el servidor. Inténtalo de nuevo.'
-                });
-            }
+            try { await postForm(formData); } catch (e) { showError('No se pudo guardar el periférico.'); }
         });
+
+        // Editar: abrir modal (solo estado)
+        document.querySelectorAll('.edit-peripheral').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const tr = this.closest('tr');
+                const estado = tr.querySelector('td:nth-child(7) .status-badge')?.textContent.trim().toLowerCase() || 'excelente';
+                const modal = document.getElementById('modalEditarPeriferico');
+                modal.querySelector('input[name="id_bien"]').value = id;
+                modal.querySelector('select[name="estado_bien"]').value = estado;
+                new bootstrap.Modal(modal).show();
+            });
+        });
+
+        // Envío formulario Editar (solo estado)
+        const formEditar = document.getElementById('formEditarPeriferico');
+        formEditar.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd = new FormData();
+            fd.append('action','update');
+            fd.append('id_bien', formEditar.querySelector('input[name="id_bien"]').value);
+            fd.append('estado_bien', formEditar.querySelector('select[name="estado_bien"]').value);
+            fd.append('csrf_token', csrfToken);
+            try { await postForm(fd); } catch (err) { showError('No se pudo actualizar el estado del periférico.'); }
+        });
+
+        // Asignar: abrir modal y preparar id
+        document.querySelectorAll('.assign-peripheral').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+                const modal = document.getElementById('modalAsignarPeriferico');
+                modal.querySelector('input[name="id_bien"]').value = id;
+                new bootstrap.Modal(modal).show();
+            });
+        });
+
+        // Envío formulario Asignar
+        const formAsignar = document.getElementById('formAsignarPeriferico');
+        formAsignar.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const fd = new FormData(formAsignar);
+            try { await postForm(fd); } catch (err) { showError('No se pudo asignar el periférico.'); }
+        });
+
+        // Acción rápida: marcar como descompuesto
+        document.querySelectorAll('.damage-peripheral').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const id = this.dataset.id;
+                Swal.fire({
+                    title: 'Marcar como descompuesto?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, marcar',
+                }).then(async (res) => {
+                    if (res.isConfirmed) {
+                        const fd = new FormData(); fd.append('action','set_damaged'); fd.append('id_bien', id); fd.append('csrf_token', csrfToken);
+                        try { await postForm(fd); } catch(e){ showError('No se pudo marcar como descompuesto.'); }
+                    }
+                });
+            });
+        });
+
+        // Nota: botón de baja eliminado por decisión de UI — no se añade el handler
+
+        // Helper: postForm centraliza llamadas y muestra mensajes
+        async function postForm(formData) {
+            const resp = await fetch('perifericos.php', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest'}, body: formData });
+            const data = await resp.json();
+            if (data.success) {
+                Swal.fire({ icon: 'success', title: 'OK', text: data.message, timer: 1200, showConfirmButton: false });
+                setTimeout(() => location.reload(), 1400);
+            } else {
+                showError(data.message || 'Error en la operación');
+                throw new Error(data.message || 'Error');
+            }
+        }
+
+        function showError(msg) {
+            Swal.fire({ icon: 'error', title: 'Error', text: msg });
+        }
     });
 </script>
 
