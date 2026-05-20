@@ -1,17 +1,13 @@
 <?php
-include_once __DIR__ . "/includes/header.php";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . "/../conexion.php";
 global $conexion;
 
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 $id_usuario_sesion = $_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0;
 
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
-    if (ob_get_length()) ob_clean();
     header('Content-Type: application/json');
     
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
@@ -148,6 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
         exit;
     }
+}
+
+include_once __DIR__ . "/includes/header.php";
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 $nombre = $_SESSION['nombre'] ?? 'Sistema';
@@ -399,6 +401,7 @@ $resultado = mysqli_query($conexion, $query);
         try {
             const res = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 body: data,
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });
