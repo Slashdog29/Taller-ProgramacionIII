@@ -62,6 +62,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         exit;
     }
 
+    if ($action === 'assign_device') {
+        $id_cliente = intval($_POST['id_cliente'] ?? 0);
+        $id_computadora = intval($_POST['id_computadora'] ?? 0);
+        $duracion = intval($_POST['duracion'] ?? 0);
+        $usuario_operador_id = intval($_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0);
+
+        if ($id_cliente <= 0 || $id_computadora <= 0 || $duracion <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Datos incompletos para la asignación.']);
+            exit;
+        }
+
+        $validarSql = "SELECT COUNT(*) AS cnt FROM sesiones WHERE cliente_id = ? AND DATE(hora_inicio) = CURDATE()";
+        $validarStmt = mysqli_prepare($conexion, $validarSql);
+        if ($validarStmt) {
+            mysqli_stmt_bind_param($validarStmt, 'i', $id_cliente);
+            mysqli_stmt_execute($validarStmt);
+            mysqli_stmt_bind_result($validarStmt, $cnt);
+            mysqli_stmt_fetch($validarStmt);
+            mysqli_stmt_close($validarStmt);
+
+            if ($cnt > 0) {
+                echo json_encode(['success' => false, 'message' => 'El cliente ya tiene una sesión registrada hoy. No se permite reingreso.']);
+                exit;
+            }
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al validar sesión existente: ' . mysqli_error($conexion)]);
+            exit;
+        }
+
+        if ($usuario_operador_id <= 0) {
+            $usuario_operador_id = 1;
+        }
+
+        $tarifa = 0.00;
+        $tipoSql = "SELECT COALESCE(t.tarifa_por_hora, 0) AS tarifa, COALESCE(t.exento_pago, 0) AS exento
+                    FROM clientes c
+                    LEFT JOIN tipos_cliente t ON c.tipo_cliente_id = t.id
+                    WHERE c.id = ? LIMIT 1";
+        $tipoStmt = mysqli_prepare($conexion, $tipoSql);
+        if ($tipoStmt) {
+            mysqli_stmt_bind_param($tipoStmt, 'i', $id_cliente);
+            mysqli_stmt_execute($tipoStmt);
+            mysqli_stmt_bind_result($tipoStmt, $tarifa_val, $exento_val);
+            if (mysqli_stmt_fetch($tipoStmt)) {
+                $tarifa = floatval($tarifa_val);
+                if (intval($exento_val) === 1) {
+                    $tarifa = 0.00;
+                }
+            }
+            mysqli_stmt_close($tipoStmt);
+        }
+
+        $insertSql = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion)
+                      VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, 'en_curso')";
+        $insertStmt = mysqli_prepare($conexion, $insertSql);
+        if ($insertStmt) {
+            mysqli_stmt_bind_param($insertStmt, 'iiiid', $id_cliente, $id_computadora, $usuario_operador_id, $duracion, $tarifa);
+            if (mysqli_stmt_execute($insertStmt)) {
+                $updateCompSql = "UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = ?";
+                $updateCompStmt = mysqli_prepare($conexion, $updateCompSql);
+                if ($updateCompStmt) {
+                    mysqli_stmt_bind_param($updateCompStmt, 'i', $id_computadora);
+                    mysqli_stmt_execute($updateCompStmt);
+                    mysqli_stmt_close($updateCompStmt);
+                }
+
+                $accion_historial = "Asignó dispositivo al cliente ID {$id_cliente} en computadora ID {$id_computadora} por {$duracion} minutos";
+                $histStmt = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+                if ($histStmt) {
+                    $histStmt->bind_param('sssss', $usuario_sesion, $ip, $fecha_hora, $sector, $accion_historial);
+                    $histStmt->execute();
+                    $histStmt->close();
+                }
+
+                echo json_encode(['success' => true, 'message' => 'Dispositivo asignado correctamente.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al registrar la sesión: ' . mysqli_stmt_error($insertStmt)]);
+            }
+            mysqli_stmt_close($insertStmt);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al preparar la inserción de sesión: ' . mysqli_error($conexion)]);
+        }
+        exit;
+    }
+
     // ACTUALIZAR CLIENTE
     if ($action === 'update') {
         $id = intval($_POST['id'] ?? 0);
@@ -187,8 +272,16 @@ if ($typeResult) {
     }
 }
 
+// Consulta de computadoras disponibles para el modal de asignación
+$computerQuery = "SELECT comp.id, comp.numero_puesto, comp.codigo_bien_nacional, comp.direccion_ip, comp.modelo, m.nombremarca
+                  FROM computadoras comp
+                  LEFT JOIN marca m ON m.id_marca = comp.marca
+                  WHERE comp.estado_operativo = 'disponible'
+                  ORDER BY comp.numero_puesto ASC";
+$computadorasDisponibles = mysqli_query($conexion, $computerQuery);
+
 // Validación de errores en la consulta
-if (!$resultado || $typeResult === false) {
+if (!$resultado || $typeResult === false || $computadorasDisponibles === false) {
     $errorMessage = mysqli_error($conexion);
     die("<div class='alert alert-danger'>Error en la consulta SQL: " . $errorMessage . "</div>");
 }
@@ -328,11 +421,10 @@ if (!$resultado || $typeResult === false) {
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group">
-                                        <!-- Botón para asignar dispositivo al cliente -->
-                                        <!-- Cambia 'asignar.php' por la ruta si la colocas en otra carpeta -->
-                                        <a href="asignar.php?id_cliente=<?php echo intval($row['id']); ?>" class="btn btn-sm btn-outline-info me-2" title="Asignar dispositivo">
+                                        <!-- Botón para abrir modal de asignación en lugar de redirigir a asignar.php -->
+                                        <button type="button" class="btn btn-sm btn-outline-info me-2 assign-device" data-bs-toggle="modal" data-bs-target="#modalAsignarDispositivo" data-id-cliente="<?php echo intval($row['id']); ?>" title="Asignar dispositivo">
                                             <i class="fas fa-desktop"></i>
-                                        </a>
+                                        </button>
 
                                         <button class="btn btn-sm btn-outline-light me-2 edit-client"><i class="fas fa-pen"></i></button>
                                         <?php if ($row['estado_cuenta'] === 'activo') { ?>
@@ -480,6 +572,58 @@ if (!$resultado || $typeResult === false) {
     </div>
 </div>
 
+<!-- Modal Asignar Dispositivo -->
+<div class="modal fade" id="modalAsignarDispositivo" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-desktop"></i> Asignar Dispositivo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="assignDeviceForm">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                    <input type="hidden" name="action" value="assign_device">
+                    <input type="hidden" name="id_cliente" id="modal_id_cliente" value="">
+
+                    <div class="mb-3">
+                        <label class="form-label">Seleccionar computadora disponible</label>
+                        <select name="id_computadora" class="form-select" required>
+                            <option value="">Seleccione computadora</option>
+                            <?php if ($computadorasDisponibles && mysqli_num_rows($computadorasDisponibles) > 0): ?>
+                                <?php while ($comp = mysqli_fetch_assoc($computadorasDisponibles)): ?>
+                                    <?php
+                                        $labelParts = [];
+                                        $labelParts[] = 'PC-' . str_pad(intval($comp['numero_puesto'] ?? 0), 2, '0', STR_PAD_LEFT);
+                                        if (!empty($comp['nombremarca'])) $labelParts[] = $comp['nombremarca'];
+                                        if (!empty($comp['modelo'])) $labelParts[] = $comp['modelo'];
+                                        if (!empty($comp['codigo_bien_nacional'])) $labelParts[] = '[' . $comp['codigo_bien_nacional'] . ']';
+                                        if (!empty($comp['direccion_ip'])) $labelParts[] = '(' . $comp['direccion_ip'] . ')';
+                                        $compLabel = implode(' ', $labelParts);
+                                    ?>
+                                    <option value="<?= intval($comp['id']) ?>"><?= htmlspecialchars($compLabel) ?></option>
+                                <?php endwhile; ?>
+                            <?php else: ?>
+                                <option value="">No hay computadoras disponibles</option>
+                            <?php endif; ?>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Duración</label>
+                        <select name="duracion" class="form-select" required>
+                            <option value="">Seleccione duración</option>
+                            <?php for ($m = 15; $m <= 240; $m += 15): ?>
+                                <option value="<?= $m ?>"><?= $m ?> minutos</option>
+                            <?php endfor; ?>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-success w-100">Asignar</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     function showMessageModal(title, message) {
         document.getElementById('messageModalTitle').innerText = title;
@@ -552,6 +696,65 @@ if (!$resultado || $typeResult === false) {
         } catch (error) {
             console.error('Error en la petición:', error);
             showMessageModal('Error', 'No se pudo enviar el formulario. Intenta de nuevo.');
+        }
+    });
+
+    // Manejo de apertura del modal de asignar dispositivo
+    document.querySelectorAll('.assign-device').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const clienteId = btn.getAttribute('data-id-cliente');
+            const modalInput = document.getElementById('modal_id_cliente');
+            if (modalInput) {
+                modalInput.value = clienteId;
+            }
+        });
+    });
+
+    // Envío del formulario de asignación en segundo plano con fetch
+    document.getElementById('assignDeviceForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const text = await response.text();
+            let result;
+            try {
+                result = JSON.parse(text);
+            } catch (error) {
+                console.error('Error analizando JSON:', text);
+                result = { success: false, message: 'Respuesta inválida del servidor.' };
+            }
+
+            if (result.success) {
+                bootstrap.Modal.getInstance(document.getElementById('modalAsignarDispositivo')).hide();
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Asignación exitosa',
+                    text: result.message,
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: result.message
+                });
+            }
+        } catch (error) {
+            console.error('Error en la petición:', error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'No se pudo asignar el dispositivo. Intenta de nuevo.'
+            });
         }
     });
 
