@@ -83,6 +83,18 @@ body {
   color: white;
 }
 
+.dropdown-submenu .dropdown-toggle::after {
+  display: none;
+}
+
+.dropdown-menu .collapse {
+  transition: height 0.2s ease;
+}
+
+.dropdown-menu .collapse .dropdown-item {
+  padding-left: 1.75rem;
+}
+
 /* ========== TARJETAS GLASS (elementos flotantes) ========== */
 .glass-card {
   background: var(--dark-bg);
