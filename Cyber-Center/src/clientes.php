@@ -1,19 +1,12 @@
 <?php
-include_once "includes/header.php";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . "/../conexion.php";
 
 global $conexion;
 
-if (!$conexion) {
-    die("<div class='alert alert-danger'>Error crítico: La conexión a la base de datos no está disponible.</div>");
-}
-
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
-    if (ob_get_length()) ob_clean();
     header('Content-Type: application/json');
 
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
@@ -285,6 +278,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
         exit;
     }
+}
+
+include_once "includes/header.php";
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 // Registro de actividad en el historial (acceso a la página)
@@ -680,6 +679,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: data
             });
@@ -698,6 +698,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });
@@ -737,6 +738,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });
@@ -797,6 +799,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });
