@@ -73,6 +73,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             exit;
         }
 
+        // 1. Verificar que el cliente no esté suspendido
+        $sql_estado = "SELECT estado_cuenta FROM clientes WHERE id = ? LIMIT 1";
+        $estadoStmt = mysqli_prepare($conexion, $sql_estado);
+        if ($estadoStmt) {
+            mysqli_stmt_bind_param($estadoStmt, 'i', $id_cliente);
+            mysqli_stmt_execute($estadoStmt);
+            mysqli_stmt_bind_result($estadoStmt, $estado_cuenta);
+            if (mysqli_stmt_fetch($estadoStmt)) {
+                if ($estado_cuenta === 'suspendido') {
+                    mysqli_stmt_close($estadoStmt);
+                    echo json_encode(['success' => false, 'message' => 'El cliente está suspendido y no puede usar las máquinas.']);
+                    exit;
+                }
+            } else {
+                mysqli_stmt_close($estadoStmt);
+                echo json_encode(['success' => false, 'message' => 'Cliente no encontrado.']);
+                exit;
+            }
+            mysqli_stmt_close($estadoStmt);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al verificar estado del cliente: ' . mysqli_error($conexion)]);
+            exit;
+        }
+
+        // 2. Verificar que el cliente no tenga sesión activa hoy
         $validarSql = "SELECT COUNT(*) AS cnt FROM sesiones WHERE cliente_id = ? AND DATE(hora_inicio) = CURDATE()";
         $validarStmt = mysqli_prepare($conexion, $validarSql);
         if ($validarStmt) {
@@ -81,7 +106,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             mysqli_stmt_bind_result($validarStmt, $cnt);
             mysqli_stmt_fetch($validarStmt);
             mysqli_stmt_close($validarStmt);
-
             if ($cnt > 0) {
                 echo json_encode(['success' => false, 'message' => 'El cliente ya tiene una sesión registrada hoy. No se permite reingreso.']);
                 exit;
@@ -91,10 +115,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             exit;
         }
 
-        if ($usuario_operador_id <= 0) {
-            $usuario_operador_id = 1;
+        // 3. Verificar que la computadora siga disponible (evita race condition)
+        $checkPc = "SELECT id FROM computadoras WHERE id = ? AND estado_operativo = 'disponible' LIMIT 1";
+        $checkStmt = mysqli_prepare($conexion, $checkPc);
+        if ($checkStmt) {
+            mysqli_stmt_bind_param($checkStmt, 'i', $id_computadora);
+            mysqli_stmt_execute($checkStmt);
+            mysqli_stmt_store_result($checkStmt);
+            if (mysqli_stmt_num_rows($checkStmt) == 0) {
+                mysqli_stmt_close($checkStmt);
+                echo json_encode(['success' => false, 'message' => 'La computadora seleccionada ya no está disponible.']);
+                exit;
+            }
+            mysqli_stmt_close($checkStmt);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al verificar disponibilidad de la PC: ' . mysqli_error($conexion)]);
+            exit;
         }
 
+        // 4. Obtener tarifa del cliente
         $tarifa = 0.00;
         $tipoSql = "SELECT COALESCE(t.tarifa_por_hora, 0) AS tarifa, COALESCE(t.exento_pago, 0) AS exento
                     FROM clientes c
@@ -114,12 +153,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             mysqli_stmt_close($tipoStmt);
         }
 
+        if ($usuario_operador_id <= 0) {
+            $usuario_operador_id = 1;
+        }
+
+        // 5. Insertar sesión
         $insertSql = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion)
                       VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, 'en_curso')";
         $insertStmt = mysqli_prepare($conexion, $insertSql);
         if ($insertStmt) {
             mysqli_stmt_bind_param($insertStmt, 'iiiid', $id_cliente, $id_computadora, $usuario_operador_id, $duracion, $tarifa);
             if (mysqli_stmt_execute($insertStmt)) {
+                // 6. Actualizar estado de la computadora a ocupado
                 $updateCompSql = "UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = ?";
                 $updateCompStmt = mysqli_prepare($conexion, $updateCompSql);
                 if ($updateCompStmt) {
@@ -128,6 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
                     mysqli_stmt_close($updateCompStmt);
                 }
 
+                // 7. Registrar en historial
                 $accion_historial = "Asignó dispositivo al cliente ID {$id_cliente} en computadora ID {$id_computadora} por {$duracion} minutos";
                 $histStmt = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
                 if ($histStmt) {
@@ -147,7 +193,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         exit;
     }
 
-    // ACTUALIZAR CLIENTE
     if ($action === 'update') {
         $id = intval($_POST['id'] ?? 0);
         $nombre_cliente = trim($_POST['nombre'] ?? '');
@@ -242,7 +287,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
     }
 }
 
-// Registro de actividad en el historial
+// Registro de actividad en el historial (acceso a la página)
 $nombre = $_SESSION['nombre'] ?? 'Usuario';
 $ip = $_SERVER['REMOTE_ADDR'];
 $fecha_hora = date('Y-m-d H:i:s');
@@ -294,7 +339,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         border-collapse: separate;
         border-spacing: 0;
     }
-
     .table thead th {
         background: rgba(0, 0, 0, 0.4);
         border-bottom: 1px solid var(--glass-border);
@@ -305,22 +349,18 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         padding: 1.25rem 1rem;
         font-weight: 800;
     }
-
     .table td {
         vertical-align: middle;
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
         padding: 1.25rem 1rem;
         background: transparent;
     }
-
     .table tbody tr {
         transition: all 0.3s ease;
     }
-
     .table tbody tr:hover {
         background: rgba(0, 0, 0, 0.3) !important;
     }
-
     .status-badge {
         border-radius: 20px;
         padding: 0.45rem 0.85rem;
@@ -329,32 +369,24 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         font-weight: 800;
         letter-spacing: 0.5px;
     }
-
     .glass-card {
         padding: 0 !important;
         overflow: hidden;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 24px;
     }
-
     .table-responsive {
         border-radius: 24px;
     }
-
-    /* Máximo contraste para legibilidad en fondo oscuro */
     .table tbody td {
         color: #ffffff !important;
     }
-
     .text-white-50 {
         color: rgba(255, 255, 255, 0.85) !important;
     }
-
     .text-muted {
         color: rgba(255, 255, 255, 0.75) !important;
     }
-
-    /* Brillo para elementos específicos */
     .bg-dark.border-secondary {
         background-color: rgba(45, 55, 72, 0.9) !important;
         border-color: rgba(255, 255, 255, 0.3) !important;
@@ -389,7 +421,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                 <tbody>
                     <?php if (mysqli_num_rows($resultado) > 0): ?>
                         <?php while ($row = mysqli_fetch_assoc($resultado)):
-                            // Compatibilidad con versiones de PHP anteriores a 8.0
                             switch ($row['estado_cuenta']) {
                                 case 'activo':
                                     $badge_class = 'bg-success';
@@ -399,7 +430,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                                     break;
                                 default:
                                     $badge_class = 'bg-secondary';
-                                    break;
                             }
                         ?>
                             <tr data-id="<?= intval($row['id']) ?>" data-nombre="<?= htmlspecialchars($row['nombre']) ?>" data-apellido="<?= htmlspecialchars($row['apellido']) ?>" data-cedula="<?= htmlspecialchars($row['cedula_o_codigo']) ?>" data-correo="<?= htmlspecialchars($row['correo']) ?>" data-tipoid="<?= intval($row['tipo_cliente_id']) ?>">
@@ -421,11 +451,9 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group">
-                                        <!-- Botón para abrir modal de asignación en lugar de redirigir a asignar.php -->
                                         <button type="button" class="btn btn-sm btn-outline-info me-2 assign-device" data-bs-toggle="modal" data-bs-target="#modalAsignarDispositivo" data-id-cliente="<?php echo intval($row['id']); ?>" title="Asignar dispositivo">
                                             <i class="fas fa-desktop"></i>
                                         </button>
-
                                         <button class="btn btn-sm btn-outline-light me-2 edit-client"><i class="fas fa-pen"></i></button>
                                         <?php if ($row['estado_cuenta'] === 'activo') { ?>
                                             <button class="btn btn-sm btn-outline-danger delete-client"><i class="fas fa-trash-alt"></i></button>
@@ -450,6 +478,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
     </div>
 </div>
 
+<!-- Modal Nuevo Cliente -->
 <div class="modal fade" id="addClientModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -461,7 +490,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                 <form id="addClientForm">
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                     <input type="hidden" name="action" value="create">
-
                     <div class="mb-3">
                         <label class="form-label">Nombre</label>
                         <input type="text" name="nombre" class="form-control" required>
@@ -487,7 +515,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <!-- Campo 'Estado de cuenta' eliminado por solicitud -->
                     <button type="submit" class="btn btn-primary w-100">Crear Cliente</button>
                 </form>
             </div>
@@ -508,7 +535,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                     <input type="hidden" name="action" value="update">
                     <input type="hidden" name="id" id="edit_client_id">
-
                     <div class="mb-3">
                         <label class="form-label">Nombre</label>
                         <input type="text" name="nombre" id="edit_nombre" class="form-control" required>
@@ -541,6 +567,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
     </div>
 </div>
 
+<!-- Modal Confirmación -->
 <div class="modal fade" id="confirmModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -557,6 +584,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
     </div>
 </div>
 
+<!-- Modal Mensaje -->
 <div class="modal fade" id="messageModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -585,7 +613,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                     <input type="hidden" name="action" value="assign_device">
                     <input type="hidden" name="id_cliente" id="modal_id_cliente" value="">
-
                     <div class="mb-3">
                         <label class="form-label">Seleccionar computadora disponible</label>
                         <select name="id_computadora" class="form-select" required>
@@ -650,7 +677,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         data.append('action', action);
         data.append('id', clientId);
         data.append('csrf_token', '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>');
-
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
@@ -669,14 +695,12 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
-
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });
-
             const text = await response.text();
             let result;
             try {
@@ -685,7 +709,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                 console.error('Error analizando JSON:', text);
                 result = { success: false, message: 'Respuesta inválida del servidor.' };
             }
-
             if (result.success) {
                 bootstrap.Modal.getInstance(document.getElementById('addClientModal')).hide();
                 showMessageModal('Éxito', result.message);
@@ -699,23 +722,18 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         }
     });
 
-    // Manejo de apertura del modal de asignar dispositivo
     document.querySelectorAll('.assign-device').forEach(btn => {
         btn.addEventListener('click', () => {
             const clienteId = btn.getAttribute('data-id-cliente');
             const modalInput = document.getElementById('modal_id_cliente');
-            if (modalInput) {
-                modalInput.value = clienteId;
-            }
+            if (modalInput) modalInput.value = clienteId;
         });
     });
 
-    // Envío del formulario de asignación en segundo plano con fetch
     document.getElementById('assignDeviceForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
-
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
@@ -730,7 +748,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                 console.error('Error analizando JSON:', text);
                 result = { success: false, message: 'Respuesta inválida del servidor.' };
             }
-
             if (result.success) {
                 bootstrap.Modal.getInstance(document.getElementById('modalAsignarDispositivo')).hide();
                 Swal.fire({
@@ -758,7 +775,6 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         }
     });
 
-    // Manejo edición de cliente
     document.querySelectorAll('.edit-client').forEach(btn => {
         btn.addEventListener('click', () => {
             const row = btn.closest('tr');
@@ -778,18 +794,15 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         e.preventDefault();
         const form = e.target;
         const formData = new FormData(form);
-
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });
-
             const text = await response.text();
             let result;
             try { result = JSON.parse(text); } catch (error) { result = { success: false, message: 'Respuesta inválida del servidor.' }; }
-
             if (result.success) {
                 bootstrap.Modal.getInstance(document.getElementById('editClientModal')).hide();
                 showMessageModal('Éxito', result.message);
@@ -808,20 +821,15 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
             const row = btn.closest('tr');
             const clientId = row.dataset.id;
             const clientName = row.dataset.nombre + ' ' + row.dataset.apellido;
-
-            showConfirmModal(
-                'Confirmar desactivación',
-                `¿Deseas desactivar al cliente <strong>${clientName}</strong>? Esta acción impedirá su uso en el sistema.`,
-                async () => {
-                    const result = await sendAction('deactivate', clientId);
-                    if (result.success) {
-                        showMessageModal('Éxito', result.message);
-                        setTimeout(() => location.reload(), 1200);
-                    } else {
-                        showMessageModal('Error', result.message);
-                    }
+            showConfirmModal('Confirmar desactivación', `¿Deseas desactivar al cliente <strong>${clientName}</strong>? Esta acción impedirá su uso en el sistema.`, async () => {
+                const result = await sendAction('deactivate', clientId);
+                if (result.success) {
+                    showMessageModal('Éxito', result.message);
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    showMessageModal('Error', result.message);
                 }
-            );
+            });
         });
     });
 
@@ -830,20 +838,15 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
             const row = btn.closest('tr');
             const clientId = row.dataset.id;
             const clientName = row.dataset.nombre + ' ' + row.dataset.apellido;
-
-            showConfirmModal(
-                'Confirmar activación',
-                `¿Deseas activar al cliente <strong>${clientName}</strong>? Podrá volver a estar activo en el sistema.`,
-                async () => {
-                    const result = await sendAction('activate', clientId);
-                    if (result.success) {
-                        showMessageModal('Éxito', result.message);
-                        setTimeout(() => location.reload(), 1200);
-                    } else {
-                        showMessageModal('Error', result.message);
-                    }
+            showConfirmModal('Confirmar activación', `¿Deseas activar al cliente <strong>${clientName}</strong>? Podrá volver a estar activo en el sistema.`, async () => {
+                const result = await sendAction('activate', clientId);
+                if (result.success) {
+                    showMessageModal('Éxito', result.message);
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    showMessageModal('Error', result.message);
                 }
-            );
+            });
         });
     });
 </script>
