@@ -200,9 +200,9 @@ CREATE TABLE `historial` (
   KEY `idx_sector` (`sector`)
 ) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Configuración global
-DROP TABLE IF EXISTS `configuracion`;
-CREATE TABLE `configuracion` (
+-- Configuración global de parámetros
+DROP TABLE IF EXISTS `configuracion_global`;
+CREATE TABLE `configuracion_global` (
   `id` int NOT NULL AUTO_INCREMENT,
   `clave` varchar(50) NOT NULL,
   `valor` text NOT NULL,
@@ -211,6 +211,17 @@ CREATE TABLE `configuracion` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `clave` (`clave`)
 ) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Configuración de la empresa / contacto
+DROP TABLE IF EXISTS `configuracion`;
+CREATE TABLE `configuracion` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `nombre` varchar(100) NOT NULL,
+  `telefono` varchar(15) NOT NULL,
+  `email` varchar(100) NOT NULL,
+  `direccion` text NOT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Log de cambios en bienes
 DROP TABLE IF EXISTS `log_cambios_bienes`;
@@ -305,8 +316,12 @@ INSERT INTO `sesiones` (`id`, `computadora_id`, `cliente_id`, `usuario_operador_
 (2, 2, 2, 1, '2026-05-15 08:30:00', '2026-05-15 10:30:00', 1.50, 3.00, 'FAC-20260515-00002', 'finalizado'),
 (3, 3, 5, 1, '2026-05-15 09:00:00', '2026-05-15 10:15:00', 0.00, 0.00, 'FAC-20260515-00003', 'finalizado');
 
--- Configuración
-INSERT INTO `configuracion` (`clave`, `valor`, `descripcion`) VALUES
+-- Configuración de la empresa / contacto
+INSERT INTO `configuracion` (`id`, `nombre`, `telefono`, `email`, `direccion`) VALUES
+(1, 'Cyber Center', '02123456785', 'cybercenter@outlook.com', 'UNERG, Edificio Ingeniería');
+
+-- Configuración global de parámetros
+INSERT INTO `configuracion_global` (`clave`, `valor`, `descripcion`) VALUES
 ('impuesto_porcentaje', '16', 'IVA o impuesto aplicado al total'),
 ('duracion_maxima_sesion_horas', '4', 'Máximo de horas por sesión permitida'),
 ('redondear_minutos', '5', 'Redondear los minutos consumidos al múltiplo de X'),
@@ -327,7 +342,7 @@ DETERMINISTIC
 BEGIN
     DECLARE redondear INT;
     DECLARE minutos_redondeados INT;
-    SET redondear = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion WHERE clave = 'redondear_minutos'), 5);
+    SET redondear = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion_global WHERE clave = 'redondear_minutos'), 5);
     SET minutos_redondeados = CEIL(p_minutos / redondear) * redondear;
     RETURN ROUND((minutos_redondeados / 60) * p_tarifa_hora, 2);
 END;;
@@ -338,7 +353,7 @@ RETURNS DECIMAL(10,2)
 DETERMINISTIC
 BEGIN
     DECLARE impuesto DECIMAL(5,2);
-    SET impuesto = COALESCE((SELECT CAST(valor AS DECIMAL(5,2)) FROM configuracion WHERE clave = 'impuesto_porcentaje'), 16);
+    SET impuesto = COALESCE((SELECT CAST(valor AS DECIMAL(5,2)) FROM configuracion_global WHERE clave = 'impuesto_porcentaje'), 16);
     RETURN ROUND(p_monto * (1 + impuesto/100), 2);
 END;;
 
@@ -346,7 +361,7 @@ DROP PROCEDURE IF EXISTS `sp_cerrar_sesiones_vencidas`;
 CREATE PROCEDURE `sp_cerrar_sesiones_vencidas`()
 BEGIN
     DECLARE max_horas INT;
-    SET max_horas = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion WHERE clave = 'duracion_maxima_sesion_horas'), 4);
+    SET max_horas = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion_global WHERE clave = 'duracion_maxima_sesion_horas'), 4);
     
     UPDATE sesiones
     SET hora_fin = NOW(),

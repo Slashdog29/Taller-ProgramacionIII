@@ -55,6 +55,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                 </a>
                                 <div class="collapse ps-3" id="configuracionesSubmenu">
                                     <ul class="list-unstyled mb-0">
+                                        <li><a class="dropdown-item" href="configuracion.php"><i class="fas fa-info-circle"></i> Ver configuración</a></li>
                                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#respaldarModal"><i class="fas fa-database"></i> Respaldar BD</a></li>
                                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#restaurarModal"><i class="fas fa-upload"></i> Restaurar BD</a></li>
                                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#historialModal"><i class="fas fa-history"></i> Historial</a></li>
