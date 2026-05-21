@@ -52,7 +52,7 @@
                             <a href="https://github.com/Don-Gato700" target="_blank" class="text-white text-decoration-none"><img src="https://github.com/Don-Gato700.png" class="avatar-colaborador me-2"> Don-Gato700</a>
                         </li>
                         <li class="mb-3">
-                            <a href="https://github.com/bellomoreno225-droid" target="_blank" class="text-white text-decoration-none"><img src="https://github.com/bellomoreno225-droid.png" class="avatar-colaborador me-2"> Tupapa</a>
+                            <a href="https://github.com/tupapa456" target="_blank" class="text-white text-decoration-none"><img src="https://github.com/tupapa456.png" class="avatar-colaborador me-2"> Tupapa</a>
                         </li>
                         <li class="mb-3">
                             <a href="https://github.com/thejoker-afk" target="_blank" class="text-white text-decoration-none"><img src="https://github.com/thejoker-afk.png" class="avatar-colaborador me-2"> TheJoker-afk</a>
