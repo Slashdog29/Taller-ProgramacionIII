@@ -2,15 +2,12 @@ $(document).ready(function () {
   // Evita que los menús (dropdowns o menús laterales colapsables) se cierren
   // automáticamente al hacer clic en opciones internas (modales o sub-colapsables).
   $(document).ready(function () {
-    $('.dropdown-menu').on('click', function (e) {
-        e.stopPropagation();
+    $(".dropdown-menu").on("click", function (e) {
+      e.stopPropagation();
     });
 
- 
-    $('.dropdown-item:not(.no-close)').on('click', function () {
-        
-    });
-});
+    $(".dropdown-item:not(.no-close)").on("click", function () {});
+  });
 
   // Cerrar sesión con confirmación
   $("#btnLogout").on("click", function (e) {
@@ -168,45 +165,80 @@ $(document).ready(function () {
     });
   }
 
-  function loadTransacciones() {
-    $.getJSON("configuraciones.php?action=transacciones", function (response) {
-      if (!response.success) {
-        $("#transaccionesTableBody").html(
-          '<tr><td colspan="5" class="text-center text-danger">No se pudo cargar las transacciones.</td></tr>',
-        );
-        return;
-      }
-      if (!response.data.length) {
-        $("#transaccionesTableBody").html(
-          '<tr><td colspan="5" class="text-center text-white-50">No hay transacciones disponibles.</td></tr>',
-        );
-        return;
-      }
-      let rows = response.data.map(function (item, index) {
-        return (
-          "<tr>" +
-          "<td>" +
-          (index + 1) +
-          "</td>" +
-          "<td>" +
-          item.tipo +
-          "</td>" +
-          "<td>" +
-          item.descripcion +
-          "</td>" +
-          "<td>" +
-          item.usuario +
-          "</td>" +
-          "<td>" +
-          item.fecha +
-          "</td>" +
-          "</tr>"
-        );
-      });
-      $("#transaccionesTableBody").html(rows.join(""));
-    }).fail(function () {
-      $("#transaccionesTableBody").html(
-        '<tr><td colspan="5" class="text-center text-danger">No se pudo cargar las transacciones.</td></tr>',
+  function loadIngresosMes() {
+    const mes = $("#mesFiltroIngresos").val();
+    // Limpiar tabla y mostrar indicador de carga
+    $("#ingresosTableBody").html(
+      '<tr><td colspan="6" class="text-center text-white-50"><i class="fas fa-spinner fa-spin me-2"></i>Filtrando datos...</td></tr>',
+    );
+
+    $.getJSON(
+      "configuraciones.php?action=transacciones&mes=" + mes,
+      function (response) {
+        if (!response.success) {
+          $("#ingresosTableBody").html(
+            '<tr><td colspan="6" class="text-center text-danger">No se pudo cargar los ingresos.</td></tr>',
+          );
+          return;
+        }
+
+        // Actualizar el monto total de ingresos si el backend lo proporciona
+        const total = response.total_mes !== undefined ? response.total_mes : 0;
+        $("#totalIngresosMes").text("$" + parseFloat(total).toFixed(2));
+
+        // Actualizar el monto total de ingresos del día
+        const totalDia =
+          response.total_dia !== undefined ? response.total_dia : 0;
+        $("#totalIngresosHoy").text("$" + parseFloat(totalDia).toFixed(2));
+
+        if (!response.data.length) {
+          $("#ingresosTableBody").html(
+            '<tr><td colspan="6" class="text-center text-white-50">No hay registros para este mes.</td></tr>',
+          );
+          return;
+        }
+        let rows = response.data.map(function (item, index) {
+          const isToday = item.fecha.includes(
+            new Date().toISOString().split("T")[0],
+          );
+          const badgeToday = isToday
+            ? '<span class="badge bg-info ms-2" style="font-size: 0.6rem;">HOY</span>'
+            : "";
+          const rowStyle = isToday
+            ? "background: rgba(13, 202, 240, 0.05);"
+            : "";
+
+          return (
+            "<tr style='" +
+            rowStyle +
+            "'>" +
+            "<td>" +
+            (index + 1) +
+            "</td>" +
+            "<td>" +
+            item.fecha +
+            badgeToday +
+            "</td>" +
+            "<td>" +
+            (item.cliente || "N/A") +
+            "</td>" +
+            "<td>" +
+            (item.computadora || "N/A") +
+            "</td>" +
+            "<td>" +
+            (item.usuario || "N/A") +
+            "</td>" +
+            "<td class='text-end fw-bold text-success'>$" +
+            parseFloat(item.monto || 0).toFixed(2) +
+            "</td>" +
+            "</tr>"
+          );
+        });
+        $("#ingresosTableBody").html(rows.join(""));
+      },
+    ).fail(function () {
+      $("#ingresosTableBody").html(
+        '<tr><td colspan="6" class="text-center text-danger">No se pudo cargar los ingresos.</td></tr>',
       );
     });
   }
@@ -218,10 +250,15 @@ $(document).ready(function () {
     loadHistorial();
   });
 
-  $("#transaccionesModal").on("show.bs.modal", function () {
-    $("#transaccionesTableBody").html(
-      '<tr><td colspan="5" class="text-center text-white-50">Cargando transacciones...</td></tr>',
+  $("#ingresosMesModal").on("show.bs.modal", function () {
+    $("#ingresosTableBody").html(
+      '<tr><td colspan="6" class="text-center text-white-50">Cargando ingresos...</td></tr>',
     );
-    loadTransacciones();
+    loadIngresosMes();
+  });
+
+  // Recargar al cambiar el mes
+  $("#mesFiltroIngresos").on("change", function () {
+    loadIngresosMes();
   });
 });
