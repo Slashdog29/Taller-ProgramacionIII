@@ -59,7 +59,7 @@ $current_page = basename($_SERVER['PHP_SELF']);
                                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#respaldarModal"><i class="fas fa-database"></i> Respaldar BD</a></li>
                                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#restaurarModal"><i class="fas fa-upload"></i> Restaurar BD</a></li>
                                         <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#historialModal"><i class="fas fa-history"></i> Historial</a></li>
-                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#transaccionesModal"><i class="fas fa-exchange-alt"></i> Transacciones</a></li>
+                                        <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#ingresosMesModal"><i class="fas fa-hand-holding-usd"></i> Ingresos del Mes</a></li>
                                     </ul>
                                 </div>
                             </li>
@@ -175,30 +175,52 @@ $current_page = basename($_SERVER['PHP_SELF']);
         </div>
     </div>
 
-    <!-- Modal Transacciones -->
-    <div class="modal fade" id="transaccionesModal" tabindex="-1">
+    <!-- Modal Ingresos del Mes -->
+    <div class="modal fade" id="ingresosMesModal" tabindex="-1">
         <div class="modal-dialog modal-xl">
             <div class="modal-content glass-modal">
                 <div class="modal-header">
-                    <h5 class="modal-title"><i class="fas fa-exchange-alt"></i> Transacciones</h5>
+                    <h5 class="modal-title"><i class="fas fa-dollar-sign"></i> Reporte de Ingresos Mensuales</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Revisa las transacciones recientes del sistema, incluyendo cambios de datos, importaciones y exportaciones.</p>
+                    <div class="row mb-3 g-3">
+                        <div class="col-md-4">
+                            <div class="p-3 rounded-4" style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);">
+                                <label class="form-label text-white-50 small fw-bold">FILTRAR POR MES:</label>
+                                <input type="month" id="mesFiltroIngresos" class="form-control bg-dark text-white border-secondary" value="<?php echo date('Y-m'); ?>">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row mb-4 g-3">
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-4 text-center" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);">
+                                <span class="d-block small text-info fw-bold text-uppercase mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Ingresos de Hoy</span>
+                                <h3 class="mb-0 fw-bold text-info" id="totalIngresosHoy">$0.00</h3>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-4 text-center" style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);">
+                                <span class="d-block small text-success fw-bold text-uppercase mb-1" style="font-size: 0.7rem; letter-spacing: 1px;">Ingresos del Mes</span>
+                                <h3 class="mb-0 fw-bold text-success" id="totalIngresosMes">$0.00</h3>
+                            </div>
+                        </div>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-dark table-striped">
                             <thead>
                                 <tr>
                                     <th>#</th>
-                                    <th>Tipo</th>
-                                    <th>Descripción</th>
-                                    <th>Usuario</th>
                                     <th>Fecha</th>
+                                    <th>Cliente</th>
+                                    <th>Equipo</th>
+                                    <th>Operador</th>
+                                    <th class="text-end">Monto</th>
                                 </tr>
                             </thead>
-                            <tbody id="transaccionesTableBody">
+                            <tbody id="ingresosTableBody">
                                 <tr>
-                                    <td colspan="5" class="text-center text-white-50">Cargando transacciones...</td>
+                                    <td colspan="6" class="text-center text-white-50">Cargando ingresos...</td>
                                 </tr>
                             </tbody>
                         </table>

@@ -1,3 +1,4 @@
+-- Active: 1779326256833@@127.0.0.1@3306@mysql
 -- =====================================================================
 -- SCRIPT COMPLETO PARA LA BASE DE DATOS bdcyber-center
 -- CON MANEJO DE LLAVES FORÁNEAS DURANTE LA CARGA DE DATOS
@@ -271,9 +272,9 @@ INSERT INTO `usuarios` (`id`, `nombre_completo`, `cedula_identidad`, `correo_ins
 
 -- Computadoras (8 equipos)
 INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `numero_serial_chasis`, `marca`, `modelo`, `color`, `direccion_ip`, `estado_operativo`, `fecha_incorporacion`) VALUES
-(1, 1, 'BIEN-PC-001', 'SN-CHASIS-001', 3, 'Optiplex 3080', 'Negro', '192.168.1.101', 'ocupado', '2026-05-15'),
-(2, 2, 'BIEN-PC-002', 'SN-CHASIS-002', 1, 'ThinkCentre M70q', 'Negro', '192.168.1.102', 'ocupado', '2026-01-15'),
-(3, 3, 'BIEN-PC-003', 'SN-CHASIS-003', 2, 'ProDesk 400 G6', 'Gris Plata', '192.168.1.103', 'ocupado', '2026-02-10'),
+(1, 1, 'BIEN-PC-001', 'SN-CHASIS-001', 3, 'Optiplex 3080', 'Negro', '192.168.1.101', 'disponible', '2026-05-15'),
+(2, 2, 'BIEN-PC-002', 'SN-CHASIS-002', 1, 'ThinkCentre M70q', 'Negro', '192.168.1.102', 'disponible', '2026-01-15'),
+(3, 3, 'BIEN-PC-003', 'SN-CHASIS-003', 2, 'ProDesk 400 G6', 'Gris Plata', '192.168.1.103', 'disponible', '2026-02-10'),
 (4, 4, 'BIEN-PC-004', 'SN-CHASIS-004', 3, 'Optiplex 5090', 'Negro', '192.168.1.104', 'disponible', '2026-03-01'),
 (5, 5, 'BIEN-PC-005', 'SN-CHASIS-005', 7, 'ROG Strix GA15', 'Gris Oscuro', '192.168.1.105', 'disponible', '2026-03-15'),
 (6, 6, 'BIEN-PC-006', 'SN-CHASIS-006', 1, 'IdeaCentre 5', 'Negro', '192.168.1.106', 'disponible', '2026-04-20'),
@@ -282,39 +283,22 @@ INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `nume
 
 -- Periféricos (referencian computadoras existentes)
 INSERT INTO `perifericos` (`computadora_id`, `tipo_periferico_id`, `codigo_bien_nacional`, `numero_serial_fabrica`, `marca`, `modelo`, `color`, `estado_fisico`) VALUES
-(1, 10, 'BIEN-MON-001', 'SN-MON-001', 'Dell', 'E2420H', 'Negro', 'excelente'),
-(1, 11, 'BIEN-TEC-001', 'SN-TEC-001', 'Logitech', 'K120', 'Negro', 'bueno'),
-(1, 7, 'BIEN-MOU-001', 'SN-MOU-001', 'Logitech', 'M90', 'Negro', 'bueno'),
-(2, 9, 'BIEN-MON-002', 'SN-MON-002', 'Lenovo', 'ThinkVision T24i', 'Negro', 'excelente'),
-(2, 8, 'BIEN-TEC-002', 'SN-TEC-002', 'Lenovo', 'Essential', 'Negro', 'excelente'),
-(2, 12, 'BIEN-MOU-002', 'SN-MOU-002', 'Lenovo', 'Essential Mouse', 'Negro', 'excelente'),
-(2, 11, 'BIEN-UPS-002', 'SN-UPS-002', 'APC', 'Easy UPS 650VA', 'Negro', 'bueno'),
-(3, 12, 'BIEN-MON-003', 'SN-MON-003', 'HP', 'P24h G4', 'Negro', 'excelente'),
-(3, 9, 'BIEN-TEC-003', 'SN-TEC-003', 'HP', 'Pavilion 300', 'Negro', 'bueno'),
-(3, 7, 'BIEN-MOU-003', 'SN-MOU-003', 'HP', 'Pavilion 300 M', 'Negro', 'bueno'),
-(4, 7, 'BIEN-MON-004', 'SN-MON-004', 'Samsung', 'T35F', 'Negro', 'bueno'),
-(4, 12, 'BIEN-AUD-004', 'SN-AUD-004', 'Sony', 'WH-CH510', 'Azul', 'regular'),
-(5, 10, 'BIEN-MON-005', 'SN-MON-005', 'Asus', 'VP228HE', 'Negro', 'excelente'),
-(5, 9, 'BIEN-TEC-005', 'SN-TEC-005', 'Razer', 'Cynosa V2', 'Negro', 'excelente'),
-(5, 8, 'BIEN-MOU-005', 'SN-MOU-005', 'Razer', 'DeathAdder Essential', 'Negro', 'excelente'),
-(5, 10, 'BIEN-CAM-005', 'SN-CAM-005', 'Logitech', 'C920 HD Pro', 'Negro', 'excelente');
-
--- Clientes
-INSERT INTO `clientes` (`id`, `tipo_cliente_id`, `cedula_o_codigo`, `nombre`, `apellido`, `correo`, `estado_cuenta`) VALUES
-(1, 6, 'V-12345678', 'Juan', 'Pérez', 'juan@estudiante.edu', 'activo'),
-(2, 7, 'V-20111222', 'Carlos', 'Mendoza', 'carlos.mendoza@gmail.com', 'activo'),
-(3, 6, 'V-25333444', 'María', 'Rodríguez', 'maria.rodriguez@estudiante.edu', 'activo'),
-(4, 8, 'V-27555666', 'Alejandro', 'Gómez', 'alejandro.gomez@estudiante.edu', 'activo'),
-(5, 6, 'V-15888999', 'Roberto', 'Lovera', 'roberto.lovera@profesor.edu', 'activo'),
-(6, 8, 'V-18222333', 'Ana', 'Castillo', 'ana.castillo@administrativo.edu', 'activo'),
-(7, 7, 'V-29444555', 'Luis', 'Sánchez', 'luis.sanchez@estudiante.edu', 'suspendido'),
-(8, 6, 'V-30666777', 'Gabriela', 'Torres', NULL, 'activo');
-
--- Sesiones
-INSERT INTO `sesiones` (`id`, `computadora_id`, `cliente_id`, `usuario_operador_id`, `hora_inicio`, `hora_fin`, `monto_tarifa_aplicada`, `monto_total_pagado`, `comprobante_factura`, `estado_transaccion`) VALUES
-(1, 1, 1, 1, '2026-05-15 08:00:00', '2026-05-15 09:00:00', 2.50, 2.50, 'FAC-20260515-00001', 'finalizado'),
-(2, 2, 2, 1, '2026-05-15 08:30:00', '2026-05-15 10:30:00', 1.50, 3.00, 'FAC-20260515-00002', 'finalizado'),
-(3, 3, 5, 1, '2026-05-15 09:00:00', '2026-05-15 10:15:00', 0.00, 0.00, 'FAC-20260515-00003', 'finalizado');
+(1, 1, 'BIEN-MON-001', 'SN-MON-001', 'Dell', 'E2420H', 'Negro', 'excelente'),
+(1, 2, 'BIEN-TEC-001', 'SN-TEC-001', 'Logitech', 'K120', 'Negro', 'bueno'),
+(1, 3, 'BIEN-MOU-001', 'SN-MOU-001', 'Logitech', 'M90', 'Negro', 'bueno'),
+(2, 1, 'BIEN-MON-002', 'SN-MON-002', 'Lenovo', 'ThinkVision T24i', 'Negro', 'excelente'),
+(2, 2, 'BIEN-TEC-002', 'SN-TEC-002', 'Lenovo', 'Essential', 'Negro', 'excelente'),
+(2, 3, 'BIEN-MOU-002', 'SN-MOU-002', 'Lenovo', 'Essential Mouse', 'Negro', 'excelente'),
+(2, 6, 'BIEN-UPS-002', 'SN-UPS-002', 'APC', 'Easy UPS 650VA', 'Negro', 'bueno'),
+(3, 1, 'BIEN-MON-003', 'SN-MON-003', 'HP', 'P24h G4', 'Negro', 'excelente'),
+(3, 2, 'BIEN-TEC-003', 'SN-TEC-003', 'HP', 'Pavilion 300', 'Negro', 'bueno'),
+(3, 3, 'BIEN-MOU-003', 'SN-MOU-003', 'HP', 'Pavilion 300 M', 'Negro', 'bueno'),
+(4, 1, 'BIEN-MON-004', 'SN-MON-004', 'Samsung', 'T35F', 'Negro', 'bueno'),
+(4, 4, 'BIEN-AUD-004', 'SN-AUD-004', 'Sony', 'WH-CH510', 'Azul', 'regular'),
+(5, 1, 'BIEN-MON-005', 'SN-MON-005', 'Asus', 'VP228HE', 'Negro', 'excelente'),
+(5, 2, 'BIEN-TEC-005', 'SN-TEC-005', 'Razer', 'Cynosa V2', 'Negro', 'excelente'),
+(5, 3, 'BIEN-MOU-005', 'SN-MOU-005', 'Razer', 'DeathAdder Essential', 'Negro', 'excelente'),
+(5, 5, 'BIEN-CAM-005', 'SN-CAM-005', 'Logitech', 'C920 HD Pro', 'Negro', 'excelente');
 
 -- Configuración de la empresa / contacto
 INSERT INTO `configuracion` (`id`, `nombre`, `telefono`, `email`, `direccion`) VALUES

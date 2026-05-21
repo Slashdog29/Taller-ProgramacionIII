@@ -34,7 +34,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
 
     if ($action === 'finalize' || $action === 'annul') {
         $newState = $action === 'finalize' ? 'finalizado' : 'anulado';
-        $stmt = $conexion->prepare("UPDATE sesiones SET hora_fin = NOW(), estado_transaccion = ? WHERE id = ? AND estado_transaccion = 'en_curso'");
+        // Calculamos minutos y monto final al momento de finalizar
+        $stmt = $conexion->prepare("UPDATE sesiones SET 
+            hora_fin = NOW(), 
+            estado_transaccion = ?
+            WHERE id = ? AND estado_transaccion = 'en_curso'");
         if ($stmt) {
             $stmt->bind_param('si', $newState, $sessionId);
             if ($stmt->execute() && $stmt->affected_rows > 0) {
