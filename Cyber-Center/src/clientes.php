@@ -534,6 +534,53 @@ if ($tiposTarifasResult) {
     .glass-modal .form-select option {
         background-color: #1a202c;
     }
+    
+    /* ========== MEJORAS VISUALES PARA BOTÓN TARIFAS Y MODAL DE TARIFAS ========== */
+    .btn-tarifas {
+        background: rgba(13, 110, 253, 0.2);
+        border: 1px solid rgba(13, 110, 253, 0.5);
+        backdrop-filter: blur(5px);
+        transition: all 0.3s ease;
+        color: #fff;
+    }
+    .btn-tarifas:hover {
+        background: rgba(13, 110, 253, 0.4);
+        border-color: #0d6efd;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    /* Mejora del modal de tarifas para efecto glass más definido */
+    .glass-modal .modal-content {
+        background: rgba(15, 23, 42, 0.95) !important;
+        backdrop-filter: blur(12px);
+        border-radius: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    /* Badges redondeados para tipos exento/normal */
+    .badge-rounded {
+        border-radius: 40px;
+        padding: 0.4rem 1rem;
+        font-weight: 600;
+        letter-spacing: 0.3px;
+    }
+    /* Separadores sutiles en tabla del modal de tarifas */
+    .tarifas-table tbody tr {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .tarifas-table tbody tr:last-child {
+        border-bottom: none;
+    }
+    /* Botón editar tarifa consistente */
+    .btn-outline-primary {
+        border-radius: 40px;
+        padding: 0.3rem 1rem;
+        transition: all 0.2s;
+    }
+    .btn-outline-primary:hover {
+        background: #0d6efd;
+        color: white;
+        transform: scale(1.02);
+    }
 </style>
 
 <div class="container main-content pb-5">
@@ -543,8 +590,8 @@ if ($tiposTarifasResult) {
             <p class="text-white-50">Administración de usuarios y cuentas</p>
         </div>
         <div>
-            <!-- Botón Tarifas (nuevo) -->
-            <button class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#modalTarifas">
+            <!-- Botón Tarifas con estilo glass mejorado -->
+            <button class="btn btn-tarifas me-2" data-bs-toggle="modal" data-bs-target="#modalTarifas">
                 <i class="fas fa-dollar-sign me-2"></i>Tarifas
             </button>
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
@@ -815,7 +862,7 @@ if ($tiposTarifasResult) {
 </div>
 
 <!-- ================================================== -->
-<!-- MODAL PARA VER Y EDITAR TARIFAS POR TIPO DE CLIENTE -->
+<!-- MODAL PARA VER Y EDITAR TARIFAS POR TIPO DE CLIENTE (MEJORADO VISUALMENTE) -->
 <!-- ================================================== -->
 <div class="modal fade" id="modalTarifas" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-lg">
@@ -826,7 +873,7 @@ if ($tiposTarifasResult) {
             </div>
             <div class="modal-body">
                 <div class="table-responsive">
-                    <table class="table table-sm table-borderless text-white">
+                    <table class="table table-sm table-borderless text-white tarifas-table">
                         <thead>
                             <tr>
                                 <th>Tipo de Cliente</th>
@@ -843,7 +890,11 @@ if ($tiposTarifasResult) {
                                         <span class="tarifa-valor" data-id="<?= $tipo['id'] ?>">$<?= number_format($tipo['tarifa_por_hora'], 2) ?></span>
                                     </td>
                                     <td class="align-middle">
-                                        <?= ($tipo['exento_pago'] == 1) ? '<span class="badge bg-warning text-dark">Exento</span>' : '<span class="badge bg-secondary">Normal</span>' ?>
+                                        <?php if ($tipo['exento_pago'] == 1): ?>
+                                            <span class="badge badge-rounded bg-warning text-dark">Exento</span>
+                                        <?php else: ?>
+                                            <span class="badge badge-rounded bg-secondary">Normal</span>
+                                        <?php endif; ?>
                                     </td>
                                     <td class="align-middle">
                                         <button class="btn btn-sm btn-outline-primary edit-tarifa-btn" data-id="<?= $tipo['id'] ?>" data-nombre="<?= htmlspecialchars($tipo['nombre_rol']) ?>" data-tarifa="<?= $tipo['tarifa_por_hora'] ?>">
@@ -860,7 +911,7 @@ if ($tiposTarifasResult) {
     </div>
 </div>
 
-<!-- Modal para editar una tarifa específica -->
+<!-- Modal para editar una tarifa específica (con estilo glass mejorado) -->
 <div class="modal fade" id="modalEditTarifa" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -1114,7 +1165,7 @@ if ($tiposTarifasResult) {
     });
 
     // ==================================================
-    // Lógica para editar tarifas (nuevo)
+    // Lógica para editar tarifas (sin cambios funcionales)
     // ==================================================
     const tarifaModal = new bootstrap.Modal(document.getElementById('modalEditTarifa'));
     document.querySelectorAll('.edit-tarifa-btn').forEach(btn => {
