@@ -4,6 +4,9 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 require_once __DIR__ . "/../conexion.php";
 
+// Habilitar el reporte de errores de mysqli para que lance excepciones (útil en PHP 8+)
+mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+
 date_default_timezone_set('America/Caracas');
 $conexion->query("SET time_zone = '-04:00'");
 
@@ -11,6 +14,10 @@ global $conexion;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
     header('Content-Type: application/json');
+    // Limpiamos cualquier salida previa (como espacios accidentales o warnings)
+    if (ob_get_length()) ob_clean();
+
+    try {
 
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
         echo json_encode(['success' => false, 'message' => 'Token CSRF inválido o sesión expirada. Por favor, recarga la página.']);
@@ -62,7 +69,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         $id_cliente = intval($_POST['id_cliente'] ?? 0);
         $id_computadora = intval($_POST['id_computadora'] ?? 0);
         $duracion = intval($_POST['duracion'] ?? 0);
-        $usuario_operador_id = intval($_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0);
+
+        // Intentamos capturar el ID desde POST o desde las diferentes claves de sesión posibles
+        $usuario_operador_id = 0;
+        if (isset($_POST['usuario_operador_id']) && intval($_POST['usuario_operador_id']) > 0) {
+            $usuario_operador_id = intval($_POST['usuario_operador_id']);
+        } else {
+            $usuario_operador_id = intval($_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0);
+        }
 
         if ($id_cliente <= 0 || $id_computadora <= 0 || $duracion <= 0) {
             echo json_encode(['success' => false, 'message' => 'Datos incompletos para la asignación.']);
@@ -149,16 +163,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             mysqli_stmt_close($tipoStmt);
         }
 
-        if ($usuario_operador_id <= 0) {
-            $usuario_operador_id = 1;
+        // VALIDACIÓN DE INTEGRIDAD: Verificar que el operador existe en la base de datos
+        $checkUser = "SELECT id FROM usuarios WHERE id = ? AND activo = 1 LIMIT 1";
+        $checkUserStmt = mysqli_prepare($conexion, $checkUser);
+        $userExists = false;
+        if ($checkUserStmt) {
+            mysqli_stmt_bind_param($checkUserStmt, 'i', $usuario_operador_id);
+            mysqli_stmt_execute($checkUserStmt);
+            mysqli_stmt_store_result($checkUserStmt);
+            if (mysqli_stmt_num_rows($checkUserStmt) > 0) {
+                $userExists = true;
+            }
+            mysqli_stmt_close($checkUserStmt);
+        }
+
+        if (!$userExists) {
+            echo json_encode(['success' => false, 'message' => 'Error: El operador (ID: '.$usuario_operador_id.') no es válido o no está activo.']);
+            exit;
         }
 
         // 5. Insertar sesión
-        $insertSql = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion)
-                      VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, 'en_curso')";
+        $insertSql = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, monto_tarifa_aplicada, estado_transaccion)
+                      VALUES (?, ?, ?, NOW(), ?, 'en_curso')";
         $insertStmt = mysqli_prepare($conexion, $insertSql);
         if ($insertStmt) {
-            mysqli_stmt_bind_param($insertStmt, 'iiiid', $id_cliente, $id_computadora, $usuario_operador_id, $duracion, $tarifa);
+            mysqli_stmt_bind_param($insertStmt, 'iiid', $id_cliente, $id_computadora, $usuario_operador_id, $tarifa);
             if (mysqli_stmt_execute($insertStmt)) {
                 // 6. Actualizar estado de la computadora a ocupado
                 $updateCompSql = "UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = ?";
@@ -281,7 +310,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
         exit;
     }
-}
+
+    if ($action === 'finish_session') {
+        $id_sesion = intval($_POST['id_sesion'] ?? 0);
+        $id_computadora = intval($_POST['id_computadora'] ?? 0);
+
+        if ($id_sesion <= 0 || $id_computadora <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Información de sesión insuficiente.']);
+            exit;
+        }
+
+        // Iniciamos transacción para asegurar consistencia
+        mysqli_begin_transaction($conexion);
+        try {
+            // 1. Finalizar la sesión en la base de datos
+            $sql_sesion = "UPDATE sesiones SET estado_transaccion = 'finalizado', hora_fin = NOW() WHERE id = ?";
+            $stmt_sesion = mysqli_prepare($conexion, $sql_sesion);
+            mysqli_stmt_bind_param($stmt_sesion, 'i', $id_sesion);
+            mysqli_stmt_execute($stmt_sesion);
+            mysqli_stmt_close($stmt_sesion);
+
+            // 2. Liberar la computadora para que aparezca como disponible
+            $sql_comp = "UPDATE computadoras SET estado_operativo = 'disponible' WHERE id = ?";
+            $stmt_comp = mysqli_prepare($conexion, $sql_comp);
+            mysqli_stmt_bind_param($stmt_comp, 'i', $id_computadora);
+            mysqli_stmt_execute($stmt_comp);
+            mysqli_stmt_close($stmt_comp);
+
+            // 3. Registrar la acción en el historial
+            $accion_historial = "Finalizó manualmente la sesión ID: $id_sesion";
+            $stmt_h = mysqli_prepare($conexion, "INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+            mysqli_stmt_bind_param($stmt_h, 'sssss', $usuario_sesion, $ip, $fecha_hora, $sector, $accion_historial);
+            mysqli_stmt_execute($stmt_h);
+            mysqli_stmt_close($stmt_h);
+
+            mysqli_commit($conexion);
+            echo json_encode(['success' => true, 'message' => 'Sesión finalizada y equipo liberado correctamente.']);
+        } catch (Exception $e) {
+            mysqli_rollback($conexion);
+            echo json_encode(['success' => false, 'message' => 'Error al finalizar la sesión: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
+    // IMPORTANTE: Si es una petición AJAX pero ninguna acción coincidió, devolvemos error y salimos.
+    // Esto evita que el servidor devuelva el HTML de la página (header.php) y rompa el JSON.
+    echo json_encode(['success' => false, 'message' => 'Acción no reconocida: ' . $action]);
+    exit;
+
+    } catch (Throwable $e) {
+        // En caso de cualquier error, devolvemos un JSON válido para evitar que el frontend rompa
+        echo json_encode(['success' => false, 'message' => 'Error en el servidor: ' . $e->getMessage()]);
+        exit;
+    }
+} else {
+    // --- BLOQUE PROTEGIDO: SOLO SE EJECUTA SI NO ES UNA PETICIÓN AJAX ---
+    // Esto garantiza que el JSON nunca se ensucie con el HTML del panel
 
 include_once "includes/header.php";
 
@@ -625,6 +709,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                     <input type="hidden" name="action" value="assign_device">
                     <input type="hidden" name="id_cliente" id="modal_id_cliente" value="">
+                    <input type="hidden" name="usuario_operador_id" value="<?= intval($_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0) ?>">
                     <div class="mb-3">
                         <label class="form-label">Seleccionar computadora disponible</label>
                         <select name="id_computadora" class="form-select" required>
@@ -867,4 +952,5 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
     });
 </script>
 
-<?php include_once "includes/footer.php"; ?>
+<?php include_once "includes/footer.php"; 
+} // Fin del bloque else AJAX ?>

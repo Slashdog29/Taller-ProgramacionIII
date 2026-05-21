@@ -10,6 +10,9 @@ $conexion->query("SET time_zone = '-04:00'");
 global $conexion;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+    
+    // 1. Limpiamos cualquier "basura" o Warning en el buffer antes de imprimir JSON
+    if (ob_get_length()) ob_clean(); 
     header('Content-Type: application/json');
 
     $action = $_POST['action'] ?? '';
@@ -35,11 +38,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         if ($stmt) {
             $stmt->bind_param('si', $newState, $sessionId);
             if ($stmt->execute() && $stmt->affected_rows > 0) {
-                $response = ['success' => true, 'message' => "Sesión marcada como $newState correctamente."];
+                // Obtener datos actualizados (calculados por triggers o columnas generadas)
+                $resData = mysqli_query($conexion, "SELECT hora_fin, minutos_consumidos, monto_total_pagado, comprobante_factura FROM sesiones WHERE id = $sessionId");
+                $updatedRow = mysqli_fetch_assoc($resData);
+
+                $response = [
+                    'success' => true, 
+                    'message' => "Sesión marcada como $newState correctamente.",
+                    'data' => $updatedRow
+                ];
                 $accion_historial = "Sesion ID $sessionId marcada como $newState";
+                
                 $hist = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
                 if ($hist) {
-                    $hist->bind_param('sssss', $_SESSION['nombre'], $_SERVER['REMOTE_ADDR'], date('Y-m-d H:i:s'), 'Sesiones', $accion_historial);
+                    // 2. CORRECCIÓN: Manejar si $_SESSION['nombre'] no existe para evitar el Warning
+                    $usuario_sesion = $_SESSION['nombre'] ?? 'Sistema'; 
+                    $ip = $_SERVER['REMOTE_ADDR'];
+                    $fecha_h = date('Y-m-d H:i:s');
+                    $sector = 'Sesiones';
+                    
+                    $hist->bind_param('sssss', $usuario_sesion, $ip, $fecha_h, $sector, $accion_historial);
                     $hist->execute();
                     $hist->close();
                 }
@@ -128,7 +146,7 @@ if (!$resultado) {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="stat-title">Total Sesiones</div>
-                        <div class="stat-value"><?php echo $totalSesiones; ?></div>
+                        <div class="stat-value" id="stat-total"><?php echo $totalSesiones; ?></div>
                     </div>
                     <div class="stat-icon"><i class="fas fa-list"></i></div>
                 </div>
@@ -139,7 +157,7 @@ if (!$resultado) {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="stat-title">Activas</div>
-                        <div class="stat-value"><?php echo $sesionesActivas; ?></div>
+                        <div class="stat-value" id="stat-activas"><?php echo $sesionesActivas; ?></div>
                     </div>
                     <div class="stat-icon"><i class="fas fa-play-circle"></i></div>
                 </div>
@@ -150,7 +168,7 @@ if (!$resultado) {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="stat-title">Finalizadas</div>
-                        <div class="stat-value"><?php echo $sesionesFinalizadas; ?></div>
+                        <div class="stat-value" id="stat-finalizadas"><?php echo $sesionesFinalizadas; ?></div>
                     </div>
                     <div class="stat-icon"><i class="fas fa-check-circle"></i></div>
                 </div>
@@ -161,7 +179,7 @@ if (!$resultado) {
                 <div class="d-flex justify-content-between align-items-center">
                     <div>
                         <div class="stat-title">Anuladas</div>
-                        <div class="stat-value"><?php echo $sesionesAnuladas; ?></div>
+                        <div class="stat-value" id="stat-anuladas"><?php echo $sesionesAnuladas; ?></div>
                     </div>
                     <div class="stat-icon"><i class="fas fa-ban"></i></div>
                 </div>
@@ -342,18 +360,50 @@ if (!$resultado) {
         modal.show();
     }
 
-    function updateSessionRow(row, newState) {
+    function updateSessionRow(row, newState, data = null) {
         const statusBadge = row.querySelector('span.status-badge');
         if (!statusBadge) return;
+
+        const oldState = row.dataset.sessionState;
 
         let badgeClass = 'bg-secondary';
         if (newState === 'en_curso') badgeClass = 'bg-success';
         if (newState === 'finalizado') badgeClass = 'bg-primary';
         if (newState === 'anulado') badgeClass = 'bg-danger';
 
+        // Actualizar estadísticas superiores si el estado cambió desde "en_curso"
+        if (oldState === 'en_curso' && (newState === 'finalizado' || newState === 'anulado')) {
+            const statActivas = document.getElementById('stat-activas');
+            if (statActivas) {
+                statActivas.textContent = Math.max(0, parseInt(statActivas.textContent) - 1);
+            }
+            
+            if (newState === 'finalizado') {
+                const statFinalizadas = document.getElementById('stat-finalizadas');
+                if (statFinalizadas) statFinalizadas.textContent = parseInt(statFinalizadas.textContent) + 1;
+            } else if (newState === 'anulado') {
+                const statAnuladas = document.getElementById('stat-anuladas');
+                if (statAnuladas) statAnuladas.textContent = parseInt(statAnuladas.textContent) + 1;
+            }
+        }
+
         statusBadge.className = 'badge status-badge ' + badgeClass;
         statusBadge.textContent = newState;
         row.dataset.sessionState = newState;
+
+        if (data) {
+            // Actualizar celdas de la tabla (Fin, Minutos, Total, Comprobante)
+            if (row.cells[4]) row.cells[4].innerText = data.hora_fin || '-';
+            if (row.cells[5]) row.cells[5].innerText = data.minutos_consumidos || '0';
+            if (row.cells[7]) row.cells[7].innerText = '$ ' + parseFloat(data.monto_total_pagado || 0).toFixed(2);
+            if (row.cells[8]) row.cells[8].innerText = data.comprobante_factura || '-';
+
+            // Actualizar atributos data para que el modal de detalles también refleje los cambios
+            row.dataset.sessionFin = data.hora_fin || '-';
+            row.dataset.sessionMinutos = data.minutos_consumidos || '0';
+            row.dataset.sessionTotal = parseFloat(data.monto_total_pagado || 0).toFixed(2);
+            row.dataset.sessionComprobante = data.comprobante_factura || '-';
+        }
 
         const actionGroup = row.querySelector('.btn-group');
         if (actionGroup) {
@@ -415,7 +465,7 @@ if (!$resultado) {
                 showConfirmModal(title, message, async () => {
                     const result = await sendSessionAction(action, sessionId);
                     if (result.success) {
-                        updateSessionRow(row, action === 'annul' ? 'anulado' : 'finalizado');
+                        updateSessionRow(row, action === 'annul' ? 'anulado' : 'finalizado', result.data);
                         showMessage('Éxito', result.message);
                     } else {
                         showMessage('Error', result.message);
