@@ -67,7 +67,74 @@
                         <i class="fab fa-github me-1"></i> Ver Repositorio del Proyecto
                     </a>
                 </div>
+                
+                <!-- Sección de Lenguajes Utilizados -->
+                <div class="mt-4 pt-3 border-top border-secondary">
+                    <h6 class="text-white-50 mb-3"><i class="fas fa-code me-1"></i> Lenguajes Utilizados</h6>
+                    
+                    <!-- Contenedores dinámicos -->
+                    <div id="github-languages-progress" class="progress mb-2" style="height: 15px; background: rgba(0,0,0,0.3);">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-secondary" style="width: 100%"></div>
+                    </div>
+                    <div id="github-languages-list" class="d-flex justify-content-between flex-wrap small text-white-50">
+                        <span>Cargando datos...</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const modalColaboradores = document.getElementById('modalColaboradores');
+    
+    // Solo cargamos los datos cuando se abra el modal para ahorrar recursos
+    modalColaboradores.addEventListener('show.bs.modal', function () {
+        fetch('https://api.github.com/repos/Slashdog29/Taller-ProgramacionIII/languages')
+            .then(response => response.json())
+            .then(data => {
+                const progressContainer = document.getElementById('github-languages-progress');
+                const listContainer = document.getElementById('github-languages-list');
+                
+                // Limpiar contenedores
+                progressContainer.innerHTML = '';
+                listContainer.innerHTML = '';
+
+                const totalBytes = Object.values(data).reduce((a, b) => a + b, 0);
+                
+                // Mapa de colores para los lenguajes principales
+                const langColors = {
+                    'PHP': 'bg-primary',
+                    'JavaScript': 'bg-warning',
+                    'HTML': 'bg-info',
+                    'CSS': 'bg-danger',
+                    'Shell': 'bg-success'
+                };
+                const textColors = {
+                    'PHP': 'text-primary',
+                    'JavaScript': 'text-warning',
+                    'HTML': 'text-info',
+                    'CSS': 'text-danger',
+                    'Shell': 'text-success'
+                };
+
+                Object.entries(data).forEach(([lang, bytes]) => {
+                    const percentage = ((bytes / totalBytes) * 100).toFixed(1);
+                    const colorClass = langColors[lang] || 'bg-secondary';
+                    const textColorClass = textColors[lang] || 'text-white';
+
+                    // Añadir a la barra de progreso
+                    progressContainer.innerHTML += `<div class="progress-bar ${colorClass}" role="progressbar" style="width: ${percentage}%" aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100" title="${lang}: ${percentage}%"></div>`;
+                    
+                    // Añadir a la lista de texto
+                    listContainer.innerHTML += `<span><span class="${textColorClass} me-1">•</span> ${lang} ${percentage}%</span>`;
+                });
+            })
+            .catch(error => {
+                console.error('Error cargando lenguajes de GitHub:', error);
+                document.getElementById('github-languages-list').innerHTML = '<span class="text-danger">Error al conectar con GitHub</span>';
+            });
+    }, { once: true }); // Solo ejecutar una vez por sesión de página
+});
+</script>
