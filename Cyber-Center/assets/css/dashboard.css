@@ -114,6 +114,38 @@ body {
   border-color: rgba(79, 70, 229, 0.5);
 }
 
+/* ========== TABLAS ESTILO GLASS ========== */
+.config-table {
+  color: #f8fafc;
+}
+.config-table th,
+.config-table td {
+  border-color: rgba(255, 255, 255, 0.08);
+  vertical-align: middle;
+}
+.config-table thead th {
+  color: rgba(226, 232, 240, 0.8);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+.config-table tbody tr {
+  transition: background 0.2s ease;
+}
+.config-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.config-table td {
+  padding: 1rem 0.75rem;
+}
+.config-actions .btn {
+  min-width: 42px;
+}
+.config-table .text-info {
+  color: #22d3ee !important;
+}
+
 /* ========== TARJETAS DE ESTADÍSTICAS ========== */
 .stat-card {
   padding: 1.2rem;
