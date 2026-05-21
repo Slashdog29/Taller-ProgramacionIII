@@ -581,7 +581,7 @@ if ($tiposTarifasResult) {
                                     $badge_class = 'bg-secondary';
                             }
                         ?>
-                            <tr data-id="<?= intval($row['id']) ?>" data-nombre="<?= htmlspecialchars($row['nombre']) ?>" data-apellido="<?= htmlspecialchars($row['apellido']) ?>" data-cedula="<?= htmlspecialchars($row['cedula_o_codigo']) ?>" data-correo="<?= htmlspecialchars($row['correo']) ?>" data-tipoid="<?= intval($row['tipo_cliente_id']) ?>">
+                            <tr data-id="<?= intval($row['id']) ?>" data-nombre="<?= htmlspecialchars($row['nombre']) ?>" data-apellido="<?= htmlspecialchars($row['apellido']) ?>" data-cedula="<?= htmlspecialchars($row['cedula_o_codigo']) ?>" data-correo="<?= htmlspecialchars($row['correo']) ?>" data-tipoid="<?= intval($row['tipo_cliente_id']) ?>" data-tarifa="<?= floatval($row['tarifa_por_hora'] ?? 0) ?>">
                                 <td class="fw-bold" style="color: var(--primary-light);">#<?php echo $row['id']; ?></td>
                                 <td>
                                     <div class="fw-semibold"><?php echo htmlspecialchars($row['nombre'] . ' ' . $row['apellido']); ?></div>
@@ -785,6 +785,19 @@ if ($tiposTarifasResult) {
                             <?php endif; ?>
                         </select>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Tarifa por hora</label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-dark border-secondary text-white">$</span>
+                                <input type="text" id="modal_tarifa_display" class="form-control" readonly>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Costo estimado</label>
+                            <input type="text" id="modal_total_estimado" class="form-control fw-bold text-success" readonly value="$ 0.00">
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label class="form-label">Duración</label>
                         <select name="duracion" class="form-select" required>
@@ -896,6 +909,17 @@ if ($tiposTarifasResult) {
         confirmModal.show();
     }
 
+    function updateEstimatedTotal() {
+        const tarifaVal = document.getElementById('modal_tarifa_display')?.value || 0;
+        const durationSelect = document.querySelector('#modalAsignarDispositivo select[name="duracion"]');
+        const durationVal = durationSelect ? durationSelect.value : 0;
+        const total = (parseFloat(tarifaVal) / 60) * parseInt(durationVal);
+        const totalDisplay = document.getElementById('modal_total_estimado');
+        if (totalDisplay) {
+            totalDisplay.value = '$ ' + (isNaN(total) ? '0.00' : total.toFixed(2));
+        }
+    }
+
     async function sendAction(action, clientId) {
         const data = new FormData();
         data.append('action', action);
@@ -950,11 +974,22 @@ if ($tiposTarifasResult) {
 
     document.querySelectorAll('.assign-device').forEach(btn => {
         btn.addEventListener('click', () => {
-            const clienteId = btn.getAttribute('data-id-cliente');
+            const row = btn.closest('tr');
+            const clienteId = row.dataset.id;
+            const tarifa = row.dataset.tarifa;
+
             const modalInput = document.getElementById('modal_id_cliente');
             if (modalInput) modalInput.value = clienteId;
+
+            const tarifaInput = document.getElementById('modal_tarifa_display');
+            if (tarifaInput) {
+                tarifaInput.value = tarifa;
+                updateEstimatedTotal();
+            }
         });
     });
+
+    document.querySelector('#modalAsignarDispositivo select[name="duracion"]')?.addEventListener('change', updateEstimatedTotal);
 
     document.getElementById('assignDeviceForm')?.addEventListener('submit', async (e) => {
         e.preventDefault();
