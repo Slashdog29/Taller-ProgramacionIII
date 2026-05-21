@@ -1,0 +1,60 @@
+
+
+Solo necesitas tener los dos archivos listo: `control_cyber.sh` (el agente) e `instalar.sh` (el instalador automatizado).
+
+---
+
+## Guía de Instalación del Agente de Control (Para Operadores)
+
+### Paso 1: Configurar la cuenta del cliente
+
+Para garantizar la seguridad de la máquina, los usuarios no deben tener permisos de administrador.
+
+1. Abre la **Configuración del Sistema** de la computadora e ingresa al apartado de **Usuarios**.
+2. Crea una cuenta nueva llamada **Estudiante** (o el nombre que prefieras para los clientes).
+
+
+3. Asegúrate de dejarla configurada como **Usuario Estándar** (No Administrador).
+
+
+4. Ponle una contraseña segura a tu cuenta principal de Administrador para que ningún cliente pueda acceder a ella.
+
+
+
+---
+
+### Paso 2: Ejecutar el Instalador Automático
+
+Este paso se hace una sola vez por computadora para ocultar el sistema y programar su inicio automático.
+
+1. Inicia sesión en la computadora con tu cuenta de **Administrador**.
+
+
+2. Conecta el pendrive donde tienes guardados los archivos `control_cyber.sh` e `instalar.sh`.
+3. Abre la carpeta del pendrive, haz clic derecho en un espacio vacío y selecciona la opción **"Abrir en una terminal"** (o "Abrir Terminal aquí").
+4. En la pantalla que se abre, escribe el siguiente comando y presiona `Enter`:
+```bash
+sudo bash instalar.sh
+
+```
+
+
+5. El sistema te pedirá la contraseña de administrador. Escríbela (no se verá nada mientras la tecleas por seguridad) y presiona `Enter`.
+6. Verás un mensaje en pantalla que dice *"¡Instalación completada con éxito!"*. Ya puedes cerrar esa ventana y retirar el pendrive.
+
+---
+
+### Paso 3: Comprobar que funciona (A prueba de errores)
+
+El sistema ya quedó configurado para arrancar solo, ser invisible y ejecutarse en segundo plano cada vez que se encienda la máquina.
+
+1. Cierra la sesión de administrador e ingresa a la cuenta del **Estudiante**.
+
+
+2. Verás que el escritorio carga con total normalidad. **No se abrirá ninguna ventana negra** ni terminales que el cliente pueda cerrar.
+
+
+3. Si deseas verificar que está trabajando de fondo, abre el **Monitor de Sistema** (la aplicación gráfica que es idéntica al Administrador de Tareas de Windows).
+
+
+4. En la lista de procesos verás uno llamado `control_cyber.sh` consumiendo 0% de recursos. Eso te confirma que el agente ya está vigilando y comunicándose con tu servidor.

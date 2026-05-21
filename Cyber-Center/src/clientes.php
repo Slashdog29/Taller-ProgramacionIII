@@ -632,7 +632,7 @@ if ($tiposTarifasResult) {
                                     $badge_class = 'bg-secondary';
                             }
                         ?>
-                            <tr data-id="<?= intval($row['id']) ?>" data-nombre="<?= htmlspecialchars($row['nombre']) ?>" data-apellido="<?= htmlspecialchars($row['apellido']) ?>" data-cedula="<?= htmlspecialchars($row['cedula_o_codigo']) ?>" data-correo="<?= htmlspecialchars($row['correo']) ?>" data-tipoid="<?= intval($row['tipo_cliente_id']) ?>">
+                            <tr data-id="<?= intval($row['id']) ?>" data-nombre="<?= htmlspecialchars($row['nombre']) ?>" data-apellido="<?= htmlspecialchars($row['apellido']) ?>" data-cedula="<?= htmlspecialchars($row['cedula_o_codigo']) ?>" data-correo="<?= htmlspecialchars($row['correo']) ?>" data-tipoid="<?= intval($row['tipo_cliente_id']) ?>" data-tarifa="<?= floatval($row['tarifa_por_hora'] ?? 0) ?>">
                                 <td class="fw-bold" style="color: var(--primary-light);">#<?php echo $row['id']; ?></td>
                                 <td>
                                     <div class="fw-semibold"><?php echo htmlspecialchars($row['nombre'] . ' ' . $row['apellido']); ?></div>
@@ -813,6 +813,7 @@ if ($tiposTarifasResult) {
                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
                     <input type="hidden" name="action" value="assign_device">
                     <input type="hidden" name="id_cliente" id="modal_id_cliente" value="">
+                    <input type="hidden" id="modal_tarifa_cliente" value="0">
                     <input type="hidden" name="usuario_operador_id" value="<?= intval($_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0) ?>">
                     <div class="mb-3">
                         <label class="form-label">Seleccionar computadora disponible</label>
@@ -838,13 +839,21 @@ if ($tiposTarifasResult) {
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Duración</label>
-                        <select name="duracion" class="form-select" required>
+                        <select name="duracion" id="modal_duracion_select" class="form-select" required>
                             <option value="">Seleccione duración</option>
                             <?php for ($m = 15; $m <= 240; $m += 15): ?>
                                 <option value="<?= $m ?>"><?= $m ?> minutos</option>
                             <?php endfor; ?>
                         </select>
                     </div>
+
+                    <div class="mt-4 p-3 rounded mb-3" style="background: rgba(255,255,255,0.05); border: 1px dashed rgba(255,255,255,0.2);">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-white-50">Costo Estimado:</span>
+                            <span class="fs-4 fw-bold text-success" id="display_costo_total">$0.00</span>
+                        </div>
+                    </div>
+
                     <button type="submit" class="btn btn-success w-100">Asignar</button>
                 </form>
             </div>
@@ -1005,10 +1014,31 @@ if ($tiposTarifasResult) {
 
     document.querySelectorAll('.assign-device').forEach(btn => {
         btn.addEventListener('click', () => {
+            const row = btn.closest('tr');
             const clienteId = btn.getAttribute('data-id-cliente');
+            const tarifa = row ? row.dataset.tarifa : 0;
+            
             const modalInput = document.getElementById('modal_id_cliente');
+            const tarifaInput = document.getElementById('modal_tarifa_cliente');
+            const displayCosto = document.getElementById('display_costo_total');
+            const duracionSelect = document.getElementById('modal_duracion_select');
+
             if (modalInput) modalInput.value = clienteId;
+            if (tarifaInput) tarifaInput.value = tarifa;
+            if (displayCosto) displayCosto.innerText = '$0.00';
+            if (duracionSelect) duracionSelect.value = '';
         });
+    });
+
+    document.getElementById('modal_duracion_select')?.addEventListener('change', function() {
+        const minutos = parseInt(this.value) || 0;
+        const tarifaHora = parseFloat(document.getElementById('modal_tarifa_cliente').value) || 0;
+        const displayCosto = document.getElementById('display_costo_total');
+
+        if (displayCosto) {
+            const total = (tarifaHora / 60) * minutos;
+            displayCosto.innerText = '$' + total.toFixed(2);
+        }
     });
 
     document.getElementById('assignDeviceForm')?.addEventListener('submit', async (e) => {

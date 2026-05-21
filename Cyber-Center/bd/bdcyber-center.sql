@@ -1,13 +1,10 @@
 -- Active: 1779326256833@@127.0.0.1@3306@mysql
 -- =====================================================================
--- SCRIPT COMPLETO PARA LA BASE DE DATOS bdcyber-center
--- CON MANEJO DE LLAVES FORÁNEAS DURANTE LA CARGA DE DATOS
+-- SCRIPT COMPLETO PARA LA BASE DE DATOS bdcyber-center (CORREGIDO)
 -- =====================================================================
 
--- Desactivar comprobaciones de claves foráneas para evitar errores de orden
 SET FOREIGN_KEY_CHECKS = 0;
 
--- Eliminar la base de datos si existe y crearla de nuevo
 DROP DATABASE IF EXISTS `bdcyber-center`;
 CREATE DATABASE `bdcyber-center`
   CHARACTER SET utf8mb4
@@ -15,32 +12,28 @@ CREATE DATABASE `bdcyber-center`
 
 USE `bdcyber-center`;
 
--- Activar el planificador de eventos (requiere privilegios)
 SET GLOBAL event_scheduler = ON;
 
 -- =====================================================================
--- 1. TABLAS PRINCIPALES (en orden de dependencia)
+-- 1. TABLAS PRINCIPALES
 -- =====================================================================
 
--- Tabla marca (referenciada por computadoras)
 DROP TABLE IF EXISTS `marca`;
 CREATE TABLE `marca` (
   `id_marca` int NOT NULL AUTO_INCREMENT,
   `nombremarca` varchar(50) NOT NULL,
   PRIMARY KEY (`id_marca`),
   UNIQUE KEY `nombremarca` (`nombremarca`)
-) ENGINE=InnoDB AUTO_INCREMENT=20 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tipos de periféricos
 DROP TABLE IF EXISTS `tipos_periferico`;
 CREATE TABLE `tipos_periferico` (
   `id` int NOT NULL AUTO_INCREMENT,
   `nombre_componente` varchar(100) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `nombre_componente` (`nombre_componente`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Tipos de cliente
 DROP TABLE IF EXISTS `tipos_cliente`;
 CREATE TABLE `tipos_cliente` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -50,9 +43,8 @@ CREATE TABLE `tipos_cliente` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `nombre_rol` (`nombre_rol`),
   CONSTRAINT `chk_tarifa_no_negativa` CHECK (`tarifa_por_hora` >= 0)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Usuarios del sistema
 DROP TABLE IF EXISTS `usuarios`;
 CREATE TABLE `usuarios` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -68,9 +60,8 @@ CREATE TABLE `usuarios` (
   UNIQUE KEY `cedula_identidad` (`cedula_identidad`),
   UNIQUE KEY `correo_institucional` (`correo_institucional`),
   KEY `idx_rol_activo` (`rol`,`activo`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Computadoras (depende de marca)
 DROP TABLE IF EXISTS `computadoras`;
 CREATE TABLE `computadoras` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -92,11 +83,9 @@ CREATE TABLE `computadoras` (
   UNIQUE KEY `direccion_ip` (`direccion_ip`),
   KEY `idx_estado` (`estado_operativo`),
   KEY `idx_ip` (`direccion_ip`),
-  KEY `marca` (`marca`),
   CONSTRAINT `computadoras_ibfk_1` FOREIGN KEY (`marca`) REFERENCES `marca` (`id_marca`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Periféricos (depende de computadoras y tipos_periferico)
 DROP TABLE IF EXISTS `perifericos`;
 CREATE TABLE `perifericos` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -116,9 +105,8 @@ CREATE TABLE `perifericos` (
   KEY `idx_tipo` (`tipo_periferico_id`),
   CONSTRAINT `perifericos_ibfk_1` FOREIGN KEY (`computadora_id`) REFERENCES `computadoras` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `perifericos_ibfk_2` FOREIGN KEY (`tipo_periferico_id`) REFERENCES `tipos_periferico` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Clientes (depende de tipos_cliente)
 DROP TABLE IF EXISTS `clientes`;
 CREATE TABLE `clientes` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -135,9 +123,8 @@ CREATE TABLE `clientes` (
   KEY `idx_estado_cuenta` (`estado_cuenta`),
   CONSTRAINT `clientes_ibfk_1` FOREIGN KEY (`tipo_cliente_id`) REFERENCES `tipos_cliente` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `chk_cedula_valida` CHECK (char_length(`cedula_o_codigo`) >= 5)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Sesiones (depende de computadoras, clientes, usuarios)
 DROP TABLE IF EXISTS `sesiones`;
 CREATE TABLE `sesiones` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -161,11 +148,9 @@ CREATE TABLE `sesiones` (
   CONSTRAINT `sesiones_ibfk_2` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `sesiones_ibfk_3` FOREIGN KEY (`usuario_operador_id`) REFERENCES `usuarios` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT,
   CONSTRAINT `chk_monto_tarifa_positivo` CHECK (`monto_tarifa_aplicada` >= 0),
-  CONSTRAINT `chk_monto_pagado_no_negativo` CHECK (`monto_total_pagado` >= 0),
-  CONSTRAINT `chk_minutos_no_negativos` CHECK (`minutos_consumidos` >= 0)
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  CONSTRAINT `chk_monto_pagado_no_negativo` CHECK (`monto_total_pagado` >= 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Auditorías de bienes (depende de usuarios)
 DROP TABLE IF EXISTS `auditorias_bienes`;
 CREATE TABLE `auditorias_bienes` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -186,7 +171,6 @@ CREATE TABLE `auditorias_bienes` (
 -- 2. TABLAS COMPLEMENTARIAS
 -- =====================================================================
 
--- Historial de eventos
 DROP TABLE IF EXISTS `historial`;
 CREATE TABLE `historial` (
   `idhistorial` int NOT NULL AUTO_INCREMENT,
@@ -199,9 +183,8 @@ CREATE TABLE `historial` (
   KEY `idx_usuario` (`usuario`),
   KEY `idx_fyh` (`fyh`),
   KEY `idx_sector` (`sector`)
-) ENGINE=InnoDB AUTO_INCREMENT=5 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Configuración global de parámetros
 DROP TABLE IF EXISTS `configuracion_global`;
 CREATE TABLE `configuracion_global` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -211,9 +194,8 @@ CREATE TABLE `configuracion_global` (
   `actualizado_en` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `clave` (`clave`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Configuración de la empresa / contacto
 DROP TABLE IF EXISTS `configuracion`;
 CREATE TABLE `configuracion` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -222,9 +204,8 @@ CREATE TABLE `configuracion` (
   `email` varchar(100) NOT NULL,
   `direccion` text NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Log de cambios en bienes
 DROP TABLE IF EXISTS `log_cambios_bienes`;
 CREATE TABLE `log_cambios_bienes` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -244,33 +225,28 @@ CREATE TABLE `log_cambios_bienes` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================================
--- 3. CARGA DE DATOS (en orden de dependencia)
+-- 3. CARGA DE DATOS
 -- =====================================================================
 
--- Datos de marca
 INSERT INTO `marca` (`id_marca`, `nombremarca`) VALUES
-(1,'lenovo'),(2,'hp'),(3,'dell'),(4,'apple'),(5,'acer'),
-(6,'toshiva'),(7,'asus'),(8,'samsung'),(9,'soni'),(10,'lg'),
-(11,'alienwre'),(12,'lanix'),(13,'generica'),(14,'msi'),(15,'gigabyte'),
-(16,'huawei'),(17,'razer'),(18,'corsair'),(19,'logitech');
+(1,'Lenovo'),(2,'HP'),(3,'Dell'),(4,'Apple'),(5,'Acer'),
+(6,'Toshiba'),(7,'Asus'),(8,'Samsung'),(9,'Sony'),(10,'LG'),
+(11,'Alienware'),(12,'Lanix'),(13,'Genérica'),(14,'MSI'),(15,'Gigabyte'),
+(16,'Huawei'),(17,'Razer'),(18,'Corsair'),(19,'Logitech');
 
--- Tipos de periférico
 INSERT INTO `tipos_periferico` (`nombre_componente`) VALUES
 ('Monitor'),('Teclado'),('Mouse'),('Auriculares / Audífonos'),
 ('Cámara Web'),('Regulador de Voltaje / UPS');
 
--- Tipos de cliente
 INSERT INTO `tipos_cliente` (`nombre_rol`, `tarifa_por_hora`, `exento_pago`) VALUES
 ('Invitado', 2.50, 0),
 ('Estudiante', 1.50, 0),
 ('Profesor', 0.00, 1),
 ('Administrativo', 0.00, 1);
 
--- Usuario administrador (contraseña: admin123)
 INSERT INTO `usuarios` (`id`, `nombre_completo`, `cedula_identidad`, `correo_institucional`, `password_hash`, `rol`, `activo`) VALUES
 (1, 'Administrador', '00000000', 'admin@ciber.edu', '$2y$10$zQ8IuFI9B3yHCS6Y9Mqz5OdV/KM7rA3/1j69B0LlHxn0x1vr7r1Om', 'super_admin', 1);
 
--- Computadoras (8 equipos)
 INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `numero_serial_chasis`, `marca`, `modelo`, `color`, `direccion_ip`, `estado_operativo`, `fecha_incorporacion`) VALUES
 (1, 1, 'BIEN-PC-001', 'SN-CHASIS-001', 3, 'Optiplex 3080', 'Negro', '192.168.1.101', 'disponible', '2026-05-15'),
 (2, 2, 'BIEN-PC-002', 'SN-CHASIS-002', 1, 'ThinkCentre M70q', 'Negro', '192.168.1.102', 'disponible', '2026-01-15'),
@@ -281,7 +257,6 @@ INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `nume
 (7, 7, 'BIEN-PC-007', 'SN-CHASIS-007', 2, 'EliteDesk 800', 'Negro', '192.168.1.107', 'disponible', '2026-05-02'),
 (8, 8, 'BIEN-PC-008', 'SN-CHASIS-008', 5, 'Aspire TC', 'Negro', '192.168.1.108', 'disponible', '2026-05-10');
 
--- Periféricos (referencian computadoras existentes)
 INSERT INTO `perifericos` (`computadora_id`, `tipo_periferico_id`, `codigo_bien_nacional`, `numero_serial_fabrica`, `marca`, `modelo`, `color`, `estado_fisico`) VALUES
 (1, 1, 'BIEN-MON-001', 'SN-MON-001', 'Dell', 'E2420H', 'Negro', 'excelente'),
 (1, 2, 'BIEN-TEC-001', 'SN-TEC-001', 'Logitech', 'K120', 'Negro', 'bueno'),
@@ -300,11 +275,9 @@ INSERT INTO `perifericos` (`computadora_id`, `tipo_periferico_id`, `codigo_bien_
 (5, 3, 'BIEN-MOU-005', 'SN-MOU-005', 'Razer', 'DeathAdder Essential', 'Negro', 'excelente'),
 (5, 5, 'BIEN-CAM-005', 'SN-CAM-005', 'Logitech', 'C920 HD Pro', 'Negro', 'excelente');
 
--- Configuración de la empresa / contacto
 INSERT INTO `configuracion` (`id`, `nombre`, `telefono`, `email`, `direccion`) VALUES
 (1, 'Cyber Center', '02123456785', 'cybercenter@outlook.com', 'UNERG, Edificio Ingeniería');
 
--- Configuración global de parámetros
 INSERT INTO `configuracion_global` (`clave`, `valor`, `descripcion`) VALUES
 ('impuesto_porcentaje', '16', 'IVA o impuesto aplicado al total'),
 ('duracion_maxima_sesion_horas', '4', 'Máximo de horas por sesión permitida'),
@@ -314,7 +287,6 @@ INSERT INTO `configuracion_global` (`clave`, `valor`, `descripcion`) VALUES
 
 -- =====================================================================
 -- 4. FUNCIONES, PROCEDIMIENTOS, VISTAS, TRIGGERS Y EVENTOS
--- (Se mantienen igual que antes, pero los incluyo completos)
 -- =====================================================================
 
 DELIMITER ;;
@@ -463,7 +435,7 @@ LEFT JOIN sesiones s ON cl.id = s.cliente_id AND s.estado_transaccion = 'finaliz
 GROUP BY cl.id
 ORDER BY total_gastado DESC;
 
--- Triggers (con desactivación temporal de comprobaciones)
+-- Triggers
 DELIMITER ;;
 
 DROP TRIGGER IF EXISTS `tr_prevent_delete_clientes`;
@@ -534,17 +506,7 @@ BEGIN
     END IF;
 END;;
 
-DROP TRIGGER IF EXISTS `tr_validar_tiempo_cliente`;
-CREATE TRIGGER `tr_validar_tiempo_cliente` BEFORE INSERT ON `sesiones` FOR EACH ROW
-BEGIN
-    DECLARE ultima_fin DATETIME;
-    SELECT MAX(hora_fin) INTO ultima_fin FROM sesiones 
-    WHERE cliente_id = NEW.cliente_id AND estado_transaccion = 'finalizado'
-      AND hora_fin > NOW() - INTERVAL 1 HOUR;
-    IF ultima_fin IS NOT NULL THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'El cliente ya tuvo una sesión en la última hora, espere antes de iniciar otra.';
-    END IF;
-END;;
+-- NOTA: El trigger de validación de tiempo por hora fue removido para evitar bloqueos innecesarios en reinicios de software cliente.
 
 DROP TRIGGER IF EXISTS `tr_computadora_ocupar`;
 CREATE TRIGGER `tr_computadora_ocupar` AFTER INSERT ON `sesiones` FOR EACH ROW
@@ -565,8 +527,14 @@ END;;
 DROP TRIGGER IF EXISTS `tr_calcular_monto_sesion`;
 CREATE TRIGGER `tr_calcular_monto_sesion` BEFORE UPDATE ON `sesiones` FOR EACH ROW
 BEGIN
+    DECLARE v_minutos INT;
     IF NEW.hora_fin IS NOT NULL AND OLD.hora_fin IS NULL THEN
-        SET NEW.monto_total_pagado = calcular_costo_sesion(NEW.monto_tarifa_aplicada, NEW.minutos_consumidos);
+        -- CORRECCIÓN: Se calculan los minutos en tiempo real ya que la columna generada STORED aún no está disponible en este punto del ciclo de vida.
+        SET v_minutos = TIMESTAMPDIFF(MINUTE, NEW.hora_inicio, NEW.hora_fin);
+        IF v_minutos < 0 THEN 
+            SET v_minutos = 0; 
+        END IF;
+        SET NEW.monto_total_pagado = calcular_costo_sesion(NEW.monto_tarifa_aplicada, v_minutos);
     END IF;
 END;;
 
@@ -634,9 +602,4 @@ BEGIN
 END;;
 DELIMITER ;
 
--- Reactivar comprobaciones de claves foráneas
 SET FOREIGN_KEY_CHECKS = 1;
-
--- =====================================================================
--- FIN DEL SCRIPT
--- =====================================================================
