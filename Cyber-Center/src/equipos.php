@@ -171,6 +171,15 @@ if ($res_p) {
     .table-perif { font-size: 0.85rem; margin-bottom: 0; color: #fff; }
     .table-perif thead th { position: sticky; top: 0; background: #1a202c; z-index: 10; border-bottom: 2px solid var(--primary-light); padding: 8px; }
     .table-perif td { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+    /* Consistencia de selects */
+    .glass-modal .form-select {
+        background-color: rgba(15, 23, 42, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #fff !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+    .glass-modal option { background: #1a202c; }
 </style>
 
     <div class="container main-content pb-5">

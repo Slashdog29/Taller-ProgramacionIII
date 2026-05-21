@@ -1,17 +1,13 @@
 <?php
-include_once __DIR__ . "/includes/header.php";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . "/../conexion.php";
 global $conexion;
 
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 $id_usuario_sesion = $_SESSION['id'] ?? $_SESSION['id_usuario'] ?? $_SESSION['usuario_id'] ?? 0;
 
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
-    if (ob_get_length()) ob_clean();
     header('Content-Type: application/json');
     
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
@@ -150,6 +146,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
     }
 }
 
+include_once __DIR__ . "/includes/header.php";
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 $nombre = $_SESSION['nombre'] ?? 'Sistema';
 $ip = $_SERVER['REMOTE_ADDR'];
 $fecha_hora = date('Y-m-d H:i:s');
@@ -192,6 +194,15 @@ $resultado = mysqli_query($conexion, $query);
     .table tbody td { color: #ffffff !important; } 
     .text-white-50 { color: rgba(255, 255, 255, 0.85) !important; } 
     .text-muted { color: rgba(255, 255, 255, 0.75) !important; }
+
+    /* Mejora de selects en modales para evitar el fondo blanco nativo */
+    .glass-modal .form-select {
+        background-color: rgba(15, 23, 42, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        color: #fff !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+    .glass-modal option { background-color: #1a202c; }
 </style>
 
     <div class="container main-content pb-5">
@@ -399,6 +410,7 @@ $resultado = mysqli_query($conexion, $query);
         try {
             const res = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 body: data,
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             });

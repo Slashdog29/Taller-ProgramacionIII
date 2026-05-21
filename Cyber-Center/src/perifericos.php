@@ -202,6 +202,15 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
     .table-responsive { border-radius: 24px; }
     .table tbody td { color: #ffffff !important; }
     .text-white-50 { color: rgba(255, 255, 255, 0.85) !important; }
+
+    /* Customización de selects para evitar fondo blanco */
+    .glass-modal .form-select {
+        background-color: rgba(0, 0, 0, 0.5) !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+        color: #fff !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+    .glass-modal option { background-color: #222; }
 </style>
 
 <div class="container main-content pb-5">

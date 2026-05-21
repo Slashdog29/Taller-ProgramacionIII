@@ -1,19 +1,15 @@
 <?php
-include_once "includes/header.php";
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 require_once __DIR__ . "/../conexion.php";
+
+date_default_timezone_set('America/Caracas');
+$conexion->query("SET time_zone = '-04:00'");
 
 global $conexion;
 
-if (!$conexion) {
-    die("<div class='alert alert-danger'>Error crítico: La conexión a la base de datos no está disponible.</div>");
-}
-
-if (empty($_SESSION['csrf_token'])) {
-    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-}
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
-    if (ob_get_length()) ob_clean();
     header('Content-Type: application/json');
 
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
@@ -287,6 +283,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
     }
 }
 
+include_once "includes/header.php";
+
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
 // Registro de actividad en el historial (acceso a la página)
 $nombre = $_SESSION['nombre'] ?? 'Usuario';
 $ip = $_SERVER['REMOTE_ADDR'];
@@ -390,6 +392,16 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
     .bg-dark.border-secondary {
         background-color: rgba(45, 55, 72, 0.9) !important;
         border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+    /* Mejora de selects en modales */
+    .glass-modal .form-select {
+        background-color: rgba(15, 23, 42, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        color: #fff !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
+    }
+    .glass-modal .form-select option {
+        background-color: #1a202c;
     }
 </style>
 
@@ -680,6 +692,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: data
             });
@@ -698,6 +711,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });
@@ -737,6 +751,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });
@@ -797,6 +812,7 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
         try {
             const response = await fetch(window.location.href, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 body: formData
             });

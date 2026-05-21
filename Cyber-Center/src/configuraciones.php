@@ -2,6 +2,9 @@
 session_start();
 require_once __DIR__ . '/../conexion.php';
 
+date_default_timezone_set('America/Caracas');
+$conexion->query("SET time_zone = '-04:00'");
+
 function escapeIdentifier($name) {
     return '`' . str_replace('`', '``', $name) . '`';
 }

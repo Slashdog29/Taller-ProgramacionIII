@@ -1,4 +1,17 @@
 $(document).ready(function () {
+  // Evita que los menús (dropdowns o menús laterales colapsables) se cierren
+  // automáticamente al hacer clic en opciones internas (modales o sub-colapsables).
+  $(document).ready(function () {
+    $('.dropdown-menu').on('click', function (e) {
+        e.stopPropagation();
+    });
+
+ 
+    $('.dropdown-item:not(.no-close)').on('click', function () {
+        
+    });
+});
+
   // Cerrar sesión con confirmación
   $("#btnLogout").on("click", function (e) {
     e.preventDefault();
@@ -211,12 +224,4 @@ $(document).ready(function () {
     );
     loadTransacciones();
   });
-
-  // Cierra el submenú de configuraciones cuando se selecciona una opción
-  $('.glass-dropdown .dropdown-item[data-bs-toggle="modal"]').on(
-    "click",
-    function () {
-      $(".collapse").collapse("hide");
-    },
-  );
 });

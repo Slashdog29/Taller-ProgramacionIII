@@ -2,6 +2,9 @@
 include_once "includes/header.php";
 require "../conexion.php";
 
+date_default_timezone_set('America/Caracas');
+$conexion->query("SET time_zone = '-04:00'");
+
 $nombre = $_SESSION['nombre'];
 $ip = $_SERVER['REMOTE_ADDR'];
 $fecha_hora = date('Y-m-d H:i:s');

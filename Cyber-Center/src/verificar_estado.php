@@ -6,6 +6,9 @@
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . "/../conexion.php"; // $conexion (procedimental)
 
+date_default_timezone_set('America/Caracas');
+mysqli_query($conexion, "SET time_zone = '-04:00'");
+
 // -----------------------------------------------------------------------------
 // NOTAS: Ajusta nombres de tablas y columnas según tu esquema.
 // - Tabla de computadoras: 'computadoras' (columnas: id, direccion_ip, estado_operativo)
