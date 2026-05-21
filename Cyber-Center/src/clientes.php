@@ -353,6 +353,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         exit;
     }
 
+    // ==================================================
+    // NUEVA ACCIÓN: Actualizar tarifa de un tipo de cliente
+    // ==================================================
+    if ($action === 'update_tarifa') {
+        $tipo_id = intval($_POST['tipo_id'] ?? 0);
+        $nueva_tarifa = floatval($_POST['tarifa_por_hora'] ?? 0);
+
+        if ($tipo_id <= 0 || $nueva_tarifa < 0) {
+            echo json_encode(['success' => false, 'message' => 'Datos inválidos para actualizar la tarifa.']);
+            exit;
+        }
+
+        $stmt = $conexion->prepare("UPDATE tipos_cliente SET tarifa_por_hora = ? WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param('di', $nueva_tarifa, $tipo_id);
+            if ($stmt->execute()) {
+                // Registrar en historial
+                $accion_historial = "Actualizó tarifa del tipo de cliente ID {$tipo_id} a {$nueva_tarifa} USD/hora";
+                $stmt_h = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+                if ($stmt_h) {
+                    $stmt_h->bind_param('sssss', $usuario_sesion, $ip, $fecha_hora, $sector, $accion_historial);
+                    $stmt_h->execute();
+                    $stmt_h->close();
+                }
+                echo json_encode(['success' => true, 'message' => 'Tarifa actualizada correctamente.']);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al actualizar la tarifa: ' . $stmt->error]);
+            }
+            $stmt->close();
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta SQL: ' . $conexion->error]);
+        }
+        exit;
+    }
+
     // IMPORTANTE: Si es una petición AJAX pero ninguna acción coincidió, devolvemos error y salimos.
     // Esto evita que el servidor devuelva el HTML de la página (header.php) y rompa el JSON.
     echo json_encode(['success' => false, 'message' => 'Acción no reconocida: ' . $action]);
@@ -415,6 +450,18 @@ $computadorasDisponibles = mysqli_query($conexion, $computerQuery);
 if (!$resultado || $typeResult === false || $computadorasDisponibles === false) {
     $errorMessage = mysqli_error($conexion);
     die("<div class='alert alert-danger'>Error en la consulta SQL: " . $errorMessage . "</div>");
+}
+
+// ==================================================
+// OBTENER TIPOS DE CLIENTE CON SUS TARIFAS PARA EL MODAL DE TARIFAS
+// ==================================================
+$tiposTarifasQuery = "SELECT id, nombre_rol, tarifa_por_hora, exento_pago FROM tipos_cliente ORDER BY nombre_rol ASC";
+$tiposTarifasResult = mysqli_query($conexion, $tiposTarifasQuery);
+$tiposTarifas = [];
+if ($tiposTarifasResult) {
+    while ($tipo = mysqli_fetch_assoc($tiposTarifasResult)) {
+        $tiposTarifas[] = $tipo;
+    }
 }
 ?>
 
@@ -495,9 +542,15 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
             <h2 class="fw-bold mb-0 text-white">Gestión de Clientes</h2>
             <p class="text-white-50">Administración de usuarios y cuentas</p>
         </div>
-        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
-            <i class="fas fa-user-plus me-2"></i>Nuevo Cliente
-        </button>
+        <div>
+            <!-- Botón Tarifas (nuevo) -->
+            <button class="btn btn-info me-2" data-bs-toggle="modal" data-bs-target="#modalTarifas">
+                <i class="fas fa-dollar-sign me-2"></i>Tarifas
+            </button>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addClientModal">
+                <i class="fas fa-user-plus me-2"></i>Nuevo Cliente
+            </button>
+        </div>
     </div>
 
     <div class="glass-card">
@@ -748,6 +801,80 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
     </div>
 </div>
 
+<!-- ================================================== -->
+<!-- MODAL PARA VER Y EDITAR TARIFAS POR TIPO DE CLIENTE -->
+<!-- ================================================== -->
+<div class="modal fade" id="modalTarifas" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-dollar-sign"></i> Tarifas por Tipo de Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-borderless text-white">
+                        <thead>
+                            <tr>
+                                <th>Tipo de Cliente</th>
+                                <th>Tarifa (USD/hora)</th>
+                                <th>Exento de pago</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($tiposTarifas as $tipo): ?>
+                                <tr id="tarifa-row-<?= $tipo['id'] ?>">
+                                    <td class="align-middle"><?= htmlspecialchars($tipo['nombre_rol']) ?></td>
+                                    <td class="align-middle">
+                                        <span class="tarifa-valor" data-id="<?= $tipo['id'] ?>">$<?= number_format($tipo['tarifa_por_hora'], 2) ?></span>
+                                    </td>
+                                    <td class="align-middle">
+                                        <?= ($tipo['exento_pago'] == 1) ? '<span class="badge bg-warning text-dark">Exento</span>' : '<span class="badge bg-secondary">Normal</span>' ?>
+                                    </td>
+                                    <td class="align-middle">
+                                        <button class="btn btn-sm btn-outline-primary edit-tarifa-btn" data-id="<?= $tipo['id'] ?>" data-nombre="<?= htmlspecialchars($tipo['nombre_rol']) ?>" data-tarifa="<?= $tipo['tarifa_por_hora'] ?>">
+                                            <i class="fas fa-edit"></i> Editar tarifa
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para editar una tarifa específica -->
+<div class="modal fade" id="modalEditTarifa" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title">Editar tarifa</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="editTarifaForm">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                    <input type="hidden" name="action" value="update_tarifa">
+                    <input type="hidden" name="tipo_id" id="edit_tarifa_tipo_id">
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de cliente</label>
+                        <input type="text" id="edit_tarifa_tipo_nombre" class="form-control" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nueva tarifa (USD/hora)</label>
+                        <input type="number" step="0.01" min="0" name="tarifa_por_hora" id="edit_tarifa_valor" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Actualizar tarifa</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     function showMessageModal(title, message) {
         document.getElementById('messageModalTitle').innerText = title;
@@ -949,6 +1076,62 @@ if (!$resultado || $typeResult === false || $computadorasDisponibles === false) 
                 }
             });
         });
+    });
+
+    // ==================================================
+    // Lógica para editar tarifas (nuevo)
+    // ==================================================
+    const tarifaModal = new bootstrap.Modal(document.getElementById('modalEditTarifa'));
+    document.querySelectorAll('.edit-tarifa-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tipoId = btn.getAttribute('data-id');
+            const tipoNombre = btn.getAttribute('data-nombre');
+            const tarifaActual = btn.getAttribute('data-tarifa');
+            document.getElementById('edit_tarifa_tipo_id').value = tipoId;
+            document.getElementById('edit_tarifa_tipo_nombre').value = tipoNombre;
+            document.getElementById('edit_tarifa_valor').value = tarifaActual;
+            tarifaModal.show();
+        });
+    });
+
+    document.getElementById('editTarifaForm')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const formData = new FormData(form);
+        try {
+            const response = await fetch(window.location.href, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                body: formData
+            });
+            const text = await response.text();
+            let result;
+            try { result = JSON.parse(text); } catch (error) { result = { success: false, message: 'Respuesta inválida del servidor.' }; }
+            if (result.success) {
+                tarifaModal.hide();
+                showMessageModal('Éxito', result.message);
+                // Actualizar la tarifa mostrada en el modal principal sin recargar la página
+                const tipoId = document.getElementById('edit_tarifa_tipo_id').value;
+                const nuevaTarifa = document.getElementById('edit_tarifa_valor').value;
+                const spanTarifa = document.querySelector(`.tarifa-valor[data-id="${tipoId}"]`);
+                if (spanTarifa) {
+                    spanTarifa.innerText = `$${parseFloat(nuevaTarifa).toFixed(2)}`;
+                }
+                // También actualizar el atributo data-tarifa del botón correspondiente
+                const botonEditar = document.querySelector(`.edit-tarifa-btn[data-id="${tipoId}"]`);
+                if (botonEditar) {
+                    botonEditar.setAttribute('data-tarifa', nuevaTarifa);
+                }
+                // Opcional: recargar la página después de unos segundos para reflejar cambios en toda la interfaz
+                setTimeout(() => location.reload(), 1500);
+            } else {
+                showMessageModal('Error', result.message);
+            }
+        } catch (error) {
+            console.error('Error en la petición:', error);
+            showMessageModal('Error', 'No se pudo actualizar la tarifa. Intenta de nuevo.');
+        }
     });
 </script>
 
