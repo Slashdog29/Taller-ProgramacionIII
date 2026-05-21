@@ -363,15 +363,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
     if ($action === 'update_tarifa') {
         $tipo_id = intval($_POST['tipo_id'] ?? 0);
         $nueva_tarifa = floatval($_POST['tarifa_por_hora'] ?? 0);
+        $exento_pago_val = ($nueva_tarifa == 0) ? 1 : 0;
 
         if ($tipo_id <= 0 || $nueva_tarifa < 0) {
             echo json_encode(['success' => false, 'message' => 'Datos inválidos para actualizar la tarifa.']);
             exit;
         }
-
-        $stmt = $conexion->prepare("UPDATE tipos_cliente SET tarifa_por_hora = ? WHERE id = ?");
+        
+        // Actualizar tarifa_por_hora y exento_pago basado en la nueva tarifa
+        $stmt = $conexion->prepare("UPDATE tipos_cliente SET tarifa_por_hora = ?, exento_pago = ? WHERE id = ?");
         if ($stmt) {
-            $stmt->bind_param('di', $nueva_tarifa, $tipo_id);
+            $stmt->bind_param('dii', $nueva_tarifa, $exento_pago_val, $tipo_id);
             if ($stmt->execute()) {
                 // Registrar en historial
                 $accion_historial = "Actualizó tarifa del tipo de cliente ID {$tipo_id} a {$nueva_tarifa} USD/hora";
@@ -1207,6 +1209,18 @@ if ($tiposTarifasResult) {
                 const botonEditar = document.querySelector(`.edit-tarifa-btn[data-id="${tipoId}"]`);
                 if (botonEditar) {
                     botonEditar.setAttribute('data-tarifa', nuevaTarifa);
+                }
+                
+                // Actualizar el badge de "Exento de pago"
+                const exentoBadge = document.querySelector(`#tarifa-row-${tipoId} .badge-rounded`);
+                if (exentoBadge) {
+                    if (parseFloat(nuevaTarifa) === 0) {
+                        exentoBadge.className = 'badge badge-rounded bg-warning text-dark';
+                        exentoBadge.innerText = 'Exento';
+                    } else {
+                        exentoBadge.className = 'badge badge-rounded bg-secondary';
+                        exentoBadge.innerText = 'Normal';
+                    }
                 }
                 // Opcional: recargar la página después de unos segundos para reflejar cambios en toda la interfaz
                 setTimeout(() => location.reload(), 1500);
