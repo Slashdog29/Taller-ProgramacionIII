@@ -21,7 +21,7 @@ if !ERRORLEVEL!==0 (
         REM Tras varios fallos, bloqueamos por precaución
         msg * "SERVIDOR NO RESPONDE. Por seguridad, la sesión se cerrará en 15 segundos. Guarde su trabajo."
         timeout /t 15 /nobreak >nul
-        rem shutdown /l
+        shutdown /l
     ) else (
         REM Reintentar después de 10 segundos
         timeout /t 10 /nobreak >nul
@@ -36,7 +36,7 @@ if !ERRORLEVEL!==0 (
         for /f "usebackq delims=" %%M in (`powershell -NoProfile -Command "$r = '!RESPONSE!' | ConvertFrom-Json; Write-Host $r.motivo"`) do set MOTIVO=%%M
         msg * "Atención: Su sesión finalizará. Motivo: !MOTIVO! La sesión se cerrará en 15 segundos. Guarde su trabajo."
         timeout /t 15 /nobreak >nul
-        rem shutdown /l
+        shutdown /l
     )
 )
 
