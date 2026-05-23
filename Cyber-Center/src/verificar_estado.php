@@ -3,30 +3,19 @@
 // Endpoint JSON que las terminales del Cyber consultan periódicamente.
 // Responde {"accion":"permitir"} o {"accion":"bloquear","motivo":"..."}
 
+<?php
+// verificar_estado.php - con control de tiempo automático
 header('Content-Type: application/json; charset=utf-8');
-require_once __DIR__ . "/../conexion.php"; // $conexion (procedimental)
+require_once __DIR__ . "/../conexion.php";
 
 date_default_timezone_set('America/Caracas');
 mysqli_query($conexion, "SET time_zone = '-04:00'");
 
-// -----------------------------------------------------------------------------
-// NOTAS: Ajusta nombres de tablas y columnas según tu esquema.
-// - Tabla de computadoras: 'computadoras' (columnas: id, direccion_ip, estado_operativo)
-// - Tabla de sesiones: 'sesiones' (columnas: id, computadora_id, estado_transaccion, hora_fin_estimada, hora_fin)
-// Valores esperados:
-// - estado_operativo: 'disponible' | 'ocupado' | 'mantenimiento' | 'desincorporado'
-// - estado_transaccion: 'en_curso' | 'finalizado' | 'anulado'
-// -----------------------------------------------------------------------------
-
 $remote_ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
 
-// Buscar la computadora por su IP
+// 1. Buscar computadora por IP
 $sql_comp = "SELECT id, estado_operativo, numero_puesto FROM computadoras WHERE direccion_ip = ? LIMIT 1";
 $stmt = mysqli_prepare($conexion, $sql_comp);
-if (!$stmt) {
-    echo json_encode(['accion' => 'bloquear', 'motivo' => 'Error interno: fallo al preparar consulta de equipo.']);
-    exit;
-}
 mysqli_stmt_bind_param($stmt, 's', $remote_ip);
 mysqli_stmt_execute($stmt);
 mysqli_stmt_bind_result($stmt, $comp_id, $estado_operativo, $numero_puesto);
@@ -34,38 +23,43 @@ $found = mysqli_stmt_fetch($stmt);
 mysqli_stmt_close($stmt);
 
 if (!$found) {
-    // Equipo no registrado -> instrucción para bloquear/expulsar al usuario
     echo json_encode(['accion' => 'bloquear', 'motivo' => 'Equipo no registrado en el sistema.']);
     exit;
 }
 
-// Si el operador liberó manualmente la computadora (cambió a 'disponible'), instruir bloqueo
+// 2. Si el operador liberó manualmente -> bloquear
 if (strtolower($estado_operativo) === 'disponible') {
     echo json_encode(['accion' => 'bloquear', 'motivo' => 'Operador liberó el equipo.']);
     exit;
 }
 
-// Buscar sesión activa para esta computadora
-$sql_ses = "SELECT id FROM sesiones WHERE computadora_id = ? AND estado_transaccion = 'en_curso' ORDER BY id DESC LIMIT 1";
+// 3. Buscar sesión activa
+$sql_ses = "SELECT id, hora_fin_estimada FROM sesiones 
+            WHERE computadora_id = ? AND estado_transaccion = 'en_curso' 
+            ORDER BY id DESC LIMIT 1";
 $stmt2 = mysqli_prepare($conexion, $sql_ses);
-if (!$stmt2) {
-    echo json_encode(['accion' => 'bloquear', 'motivo' => 'Error interno: fallo al preparar consulta de sesión.']);
-    exit;
-}
 mysqli_stmt_bind_param($stmt2, 'i', $comp_id);
 mysqli_stmt_execute($stmt2);
-mysqli_stmt_bind_result($stmt2, $ses_id);
+mysqli_stmt_bind_result($stmt2, $ses_id, $hora_fin_estimada);
 $has_session = mysqli_stmt_fetch($stmt2);
 mysqli_stmt_close($stmt2);
 
 if (!$has_session) {
-    // No hay sesión en curso -> bloquear
     echo json_encode(['accion' => 'bloquear', 'motivo' => 'No hay sesión activa para esta máquina.']);
     exit;
 }
 
-// Si llega hasta aquí, todo está OK -> permitir el uso
+// 4. VERIFICAR AUTOMÁTICAMENTE SI EL TIEMPO EXPIRÓ (nueva lógica)
+$ahora = new DateTime();
+$fin = new DateTime($hora_fin_estimada);
+if ($ahora > $fin) {
+    // Tiempo expirado: se puede cerrar la sesión automáticamente en la BD (opcional)
+    // mysqli_query($conexion, "UPDATE sesiones SET estado_transaccion = 'finalizado', hora_fin = NOW() WHERE id = $ses_id");
+    // mysqli_query($conexion, "UPDATE computadoras SET estado_operativo = 'disponible' WHERE id = $comp_id");
+    echo json_encode(['accion' => 'bloquear', 'motivo' => 'Tiempo de sesión agotado.']);
+    exit;
+}
+
+// Si todo está correcto
 echo json_encode(['accion' => 'permitir']);
 exit;
-
-// FIN verificar_estado.php
