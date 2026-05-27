@@ -11,7 +11,7 @@ header('Content-Type: application/json');
 
 // Sanitizar y validar las entradas
 $entity_id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
-$entity_type = filter_input(INPUT_GET, 'tipo', FILTER_SANITIZE_STRING);
+$entity_type = isset($_GET['tipo']) ? trim($_GET['tipo']) : '';
 
 // Verificar que los parámetros sean válidos
 if (!$entity_id || $entity_id <= 0) {

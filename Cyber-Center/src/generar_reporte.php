@@ -66,10 +66,10 @@ if ($tipo_reporte === 'individual' && $id > 0) {
     $pdf->Ln(5);
 
     if ($entity_type === 'equipo') {
-        $stmt = $conexion->prepare("SELECT c.*, m.nombremarca, mod.nombre_modelo 
+        $stmt = $conexion->prepare("SELECT c.*, m.nombremarca, mdl.nombre_modelo 
                                     FROM computadoras c 
                                     JOIN marca m ON c.marca = m.id_marca 
-                                    JOIN modelos mod ON c.modelo_id = mod.id 
+                                    JOIN modelos mdl ON c.modelo_id = mdl.id 
                                     WHERE c.id = ?");
         $stmt->bind_param("i", $id);
         $stmt->execute();
@@ -126,11 +126,11 @@ if ($tipo_reporte === 'individual' && $id > 0) {
     $pdf->Cell(0, 10, 'REPORTE CONSOLIDADO DE INVENTARIO', 0, 1, 'C');
     $pdf->Ln(5);
 
-    $query = "SELECT m.nombremarca, mod.nombre_modelo, COUNT(c.id) as total_equipos, c.estado_operativo 
+    $query = "SELECT m.nombremarca, mdl.nombre_modelo, COUNT(c.id) as total_equipos, c.estado_operativo 
               FROM computadoras c 
               JOIN marca m ON c.marca = m.id_marca 
-              JOIN modelos mod ON c.modelo_id = mod.id
-              GROUP BY m.nombremarca, mod.nombre_modelo, c.estado_operativo";
+              JOIN modelos mdl ON c.modelo_id = mdl.id
+              GROUP BY m.nombremarca, mdl.nombre_modelo, c.estado_operativo";
     $res = $conexion->query($query);
 
     $tbl = '<table border="1" cellpadding="4">
@@ -186,10 +186,10 @@ if ($tipo_reporte === 'individual' && $id > 0) {
     $pdf->Cell(40, 7, 'ESTADO', 1, 1, 'C', 1); 
     
     $pdf->SetFont('helvetica', '', 9);
-    $sql = "SELECT c.id, m.nombremarca, mod.nombre_modelo, c.estado_operativo 
+    $sql = "SELECT c.id, m.nombremarca, mdl.nombre_modelo, c.estado_operativo 
             FROM computadoras c 
             JOIN marca m ON c.marca = m.id_marca
-            JOIN modelos mod ON c.modelo_id = mod.id";
+            JOIN modelos mdl ON c.modelo_id = mdl.id";
     $res = $conexion->query($sql);
     while($row = $res->fetch_assoc()) {
         $pdf->Cell(15, 6, $row['id'], 1, 0, 'C'); 

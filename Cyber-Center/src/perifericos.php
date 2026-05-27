@@ -203,9 +203,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
     // MySQL puede convertir 'YYYY-MM-DD' a DATETIME 'YYYY-MM-DD 00:00:00' automáticamente.
     // No es necesario añadir la hora si el input es solo de fecha.
 
-    $mstmt = $conexion->prepare("INSERT INTO mantenimientos (equipo_id, periferico_id, fecha_mantenimiento, tipo_mantenimiento, razon, diagnostico_correccion) VALUES (NULL, ?, ?, ?, ?, ?)");
+    $mstmt = $conexion->prepare("INSERT INTO mantenimientos (tipo_entidad, entidad_id, fecha_mantenimiento, tipo_mantenimiento, descripcion_falla, accion_realizada, tecnico_responsable) VALUES ('Periferico', ?, ?, ?, ?, ?, ?)");
     if ($mstmt) {
-        $mstmt->bind_param('issss', $id, $fecha, $tipo, $razon, $diagnostico);
+        $mstmt->bind_param('isssss', $id, $fecha, $tipo, $razon, $diagnostico, $usuario_sesion);
         $stmt = $mstmt; // Asignar a $stmt para el manejo común de éxito/error
         $msg = "Mantenimiento registrado correctamente.";
         $accion_historial = "Registró mantenimiento ($tipo) para periférico ID $id";
@@ -244,7 +244,7 @@ $query = "SELECT p.*, tp.nombre_componente, comp.numero_puesto, comp.codigo_bien
           FROM perifericos p
           LEFT JOIN tipos_periferico tp ON tp.id = p.tipo_periferico_id
           LEFT JOIN computadoras comp ON comp.id = p.computadora_id
-          LEFT JOIN mantenimientos m ON p.id = m.periferico_id
+          LEFT JOIN mantenimientos m ON p.id = m.entidad_id AND m.tipo_entidad = 'Periferico'
           GROUP BY p.id
           ORDER BY p.fecha_registro DESC LIMIT ? OFFSET ?";
 
@@ -541,9 +541,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                         <div class="col-md-12">
                             <label class="form-label text-white-50 small fw-bold">TIPO DE MANTENIMIENTO</label>
                             <select name="tipo_mantenimiento" id="tipo_mantenimiento" class="form-select" required>
-                                <option value="preventivo">Preventivo</option>
-                                <option value="correctivo">Correctivo</option>
-                            </select>
+                                <option value="
                         </div>
                         <div class="col-md-12">
                             <label class="form-label text-white-50 small fw-bold">RAZÓN / MOTIVO</label>
@@ -804,9 +802,8 @@ document.addEventListener('DOMContentLoaded', function(){
                 if (data.success && data.mantenimientos.length > 0) {
                     let html = '<div class="timeline">';
                     data.mantenimientos.forEach((maint, index) => {
-                        const typeBadge = maint.tipo_mantenimiento === 'preventivo' ? 'bg-success' : 'bg-danger';
-                        const invertedClass = index % 2 === 1 ? 'timeline-inverted' : ''; // Alternar lados
-                        html += `
+                        const typeBadge = maint.tipo_mantenimiento.toLowerCase() === 'preventivo' ? 'bg-success' : 'bg-danger';
+                        const invertedClass = index % 2 === 1 ? 'ti
                             <div class="timeline-item ${invertedClass}">
                                 <div class="timeline-badge ${typeBadge}"></div>
                                 <div class="timeline-panel glass-card p-3 mb-3">

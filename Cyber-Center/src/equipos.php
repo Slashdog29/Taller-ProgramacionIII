@@ -148,19 +148,29 @@ $pagina_actual = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
 $offset = ($pagina_actual - 1) * $por_pagina;
 
 // 1. Conteo total de registros
-$total_res = mysqli_query($conexion, "SELECT COUNT(*) as total FROM vista_inventario_computadoras v JOIN computadoras c ON v.compu_id = c.id");
+$total_res = mysqli_query($conexion, "SELECT COUNT(*) as total FROM computadoras");
 $total_registros = mysqli_fetch_assoc($total_res)['total'];
 $total_paginas = ceil($total_registros / $por_pagina);
 
 // 2. Consulta principal con LIMIT y OFFSET usando sentencias preparadas
-$query = "SELECT v.*, c.numero_serial_chasis, c.marca as marca_id,
-          (SELECT GROUP_CONCAT(id) FROM perifericos WHERE computadora_id = v.compu_id) as perifericos_ids,
-          COUNT(m.id) AS total_mantenimientos
-          FROM vista_inventario_computadoras v
-          JOIN computadoras c ON v.compu_id = c.id
-          LEFT JOIN mantenimientos m ON v.compu_id = m.equipo_id
-          GROUP BY v.compu_id
-          ORDER BY v.numero_puesto ASC LIMIT ? OFFSET ?";
+$query = "SELECT 
+            c.id AS compu_id, c.numero_puesto, c.direccion_ip, c.estado_operativo, 
+            c.codigo_bien_nacional AS bien_nacional_pc, c.color AS pc_color,
+            c.numero_serial_chasis, c.marca AS marca_id, c.modelo_id,
+            mar.nombremarca AS pc_marca, modl.nombre_modelo AS pc_modelo,
+            (SELECT COUNT(*) FROM perifericos WHERE computadora_id = c.id) AS perifericos_asignados,
+            (SELECT GROUP_CONCAT(CONCAT(tp2.nombre_componente, ': ', p2.marca, ' ', p2.modelo) SEPARATOR ', ') 
+             FROM perifericos p2 
+             JOIN tipos_periferico tp2 ON p2.tipo_periferico_id = tp2.id 
+             WHERE p2.computadora_id = c.id) AS detalle_perifericos,
+            (SELECT GROUP_CONCAT(id) FROM perifericos WHERE computadora_id = c.id) as perifericos_ids,
+            COUNT(m.id) AS total_mantenimientos
+          FROM computadoras c
+          LEFT JOIN marca mar ON c.marca = mar.id_marca
+          LEFT JOIN modelos modl ON c.modelo_id = modl.id
+          LEFT JOIN mantenimientos m ON c.id = m.entidad_id AND m.tipo_entidad = 'Equipo'
+          GROUP BY c.id
+          ORDER BY c.numero_puesto ASC LIMIT ? OFFSET ?";
 
 $stmt_query = mysqli_prepare($conexion, $query);
 mysqli_stmt_bind_param($stmt_query, "ii", $por_pagina, $offset);
@@ -358,14 +368,8 @@ if ($res_p) {
                 <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addModeloModal">
                     <i class="fas fa-microchip me-2"></i>Registrar Modelo
                 </button>
-                <button class="btn btn-outline-info" onclick="window.open('generar_reporte.php?tipo=consolidado', '_blank')" title="Reporte Consolidado de Inventario">
-                    <i class="fas fa-file-pdf me-2"></i>Consolidado
-                </button>
-                <button class="btn btn-outline-info" onclick="window.open('generar_reporte.php?tipo=general', '_blank')" title="Reporte General Básico de Inventario">
-                    <i class="fas fa-file-pdf me-2"></i>General Básico
-                </button>
-                <button class="btn btn-outline-info" onclick="window.open('generar_reporte.php?tipo=mantenimiento', '_blank')" title="Reporte General de Mantenimientos">
-                    <i class="fas fa-file-pdf me-2"></i>Mantenimientos
+                <button class="btn btn-outline-info" data-bs-toggle="modal" data-bs-target="#reportsModal">
+                    <i class="fas fa-file-pdf me-2"></i>Reportes
                 </button>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEquipoModal" onclick="prepareAddModal()">
                     <i class="fas fa-plus me-2"></i>Registrar Equipo
@@ -417,7 +421,7 @@ if ($res_p) {
                             $badge_class = match($row['estado_operativo']) {
                                 'disponible' => 'bg-success',
                                 'ocupado' => 'bg-primary',
-                                'mantenimiento' => 'bg-warning text-dark',
+                                'En Mantenimiento' => 'bg-warning text-dark',
                                 'desincorporado' => 'bg-danger',
                                 default => 'bg-secondary'
                             };
@@ -760,8 +764,8 @@ if ($res_p) {
                     <div class="mb-3">
                         <label class="form-label small fw-bold">TIPO DE MANTENIMIENTO</label>
                         <select name="tipo_mantenimiento" id="tipo_mantenimiento" class="form-select" required>
-                            <option value="preventivo">Preventivo</option>
-                            <option value="correctivo">Correctivo</option>
+                            <option value="Preventivo">Preventivo</option>
+                            <option value="Correctivo">Correctivo</option>
                         </select>
                     </div>
                     
@@ -802,6 +806,31 @@ if ($res_p) {
     </div>
 </div>
 
+<!-- Modal para selección de Reportes -->
+<div class="modal fade" id="reportsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title text-white"><i class="fas fa-file-pdf me-2"></i>Generar Reporte</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-outline-info text-start" onclick="window.open('generar_reporte.php?tipo=consolidado', '_blank'); bootstrap.Modal.getInstance(document.getElementById('reportsModal')).hide();">
+                        <i class="fas fa-layer-group me-2"></i>Consolidado
+                    </button>
+                    <button class="btn btn-outline-info text-start" onclick="window.open('generar_reporte.php?tipo=general', '_blank'); bootstrap.Modal.getInstance(document.getElementById('reportsModal')).hide();">
+                        <i class="fas fa-list-alt me-2"></i>General Básico
+                    </button>
+                    <button class="btn btn-outline-info text-start" onclick="window.open('generar_reporte.php?tipo=mantenimiento', '_blank'); bootstrap.Modal.getInstance(document.getElementById('reportsModal')).hide();">
+                        <i class="fas fa-tools me-2"></i>Mantenimientos
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="statusModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -818,7 +847,7 @@ if ($res_p) {
                         <label class="form-label">Nuevo estado para <strong id="status_name"></strong></label>
                         <select name="estado" id="status_select" class="form-select" required>
                             <option value="disponible">Disponible</option>
-                            <option value="mantenimiento">Mantenimiento</option>
+                            <option value="En Mantenimiento">Mantenimiento</option>
                             <option value="desincorporado">Desincorporado</option>
                         </select>
                     </div>
@@ -971,7 +1000,7 @@ if ($res_p) {
                 if (data.success && data.mantenimientos.length > 0) {
                     let html = '<div class="timeline">';
                     data.mantenimientos.forEach((maint, index) => {
-                        const typeBadge = maint.tipo_mantenimiento === 'preventivo' ? 'bg-success' : 'bg-danger';
+                        const typeBadge = maint.tipo_mantenimiento.toLowerCase() === 'preventivo' ? 'bg-success' : 'bg-danger';
                         const invertedClass = index % 2 === 1 ? 'timeline-inverted' : ''; // Alternar lados
                         html += `
                             <div class="timeline-item ${invertedClass}">

@@ -438,7 +438,7 @@ SELECT
     c.numero_puesto,
     c.codigo_bien_nacional AS bien_nacional_pc,
     m.nombremarca AS pc_marca,
-    mod.nombre_modelo AS pc_modelo,
+    mdl.nombre_modelo AS pc_modelo,
     c.color AS pc_color,
     c.estado_operativo,
     c.direccion_ip,
@@ -446,7 +446,7 @@ SELECT
     GROUP_CONCAT(DISTINCT CONCAT(tp.nombre_componente, ' (', p.marca, ' ', p.modelo, ')') SEPARATOR '; ') AS detalle_perifericos
 FROM computadoras c
 LEFT JOIN marca m ON c.marca = m.id_marca
-LEFT JOIN modelos mod ON c.modelo_id = mod.id
+LEFT JOIN modelos mdl ON c.modelo_id = mdl.id
 LEFT JOIN perifericos p ON c.id = p.computadora_id
 LEFT JOIN tipos_periferico tp ON p.tipo_periferico_id = tp.id
 GROUP BY c.id;

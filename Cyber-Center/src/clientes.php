@@ -450,9 +450,10 @@ if ($typeResult) {
 }
 
 // Consulta de computadoras disponibles para el modal de asignación
-$computerQuery = "SELECT comp.id, comp.numero_puesto, comp.codigo_bien_nacional, comp.direccion_ip, comp.modelo, m.nombremarca
+$computerQuery = "SELECT comp.id, comp.numero_puesto, comp.codigo_bien_nacional, comp.direccion_ip, mdl.nombre_modelo AS modelo, m.nombremarca
                   FROM computadoras comp
                   LEFT JOIN marca m ON m.id_marca = comp.marca
+                  LEFT JOIN modelos mdl ON mdl.id = comp.modelo_id
                   WHERE comp.estado_operativo = 'disponible'
                   ORDER BY comp.numero_puesto ASC";
 $computadorasDisponibles = mysqli_query($conexion, $computerQuery);
