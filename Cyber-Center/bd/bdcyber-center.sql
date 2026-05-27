@@ -1,6 +1,6 @@
 -- Active: 1779326256833@@127.0.0.1@3306@mysql
 -- =====================================================================
--- SCRIPT COMPLETO PARA LA BASE DE DATOS bdcyber-center (CORREGIDO V2)
+-- SCRIPT COMPLETO PARA LA BASE DE DATOS bdcyber-center (CORREGIDO)
 -- =====================================================================
 
 SET FOREIGN_KEY_CHECKS = 0;
@@ -32,14 +32,6 @@ CREATE TABLE `tipos_periferico` (
   `nombre_componente` varchar(100) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `nombre_componente` (`nombre_componente`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-DROP TABLE IF EXISTS `modelo`;
-CREATE TABLE `modelo` (
-  `id_modelo` int NOT NULL AUTO_INCREMENT,
-  `nombre_modelo` varchar(100) NOT NULL,
-  PRIMARY KEY (`id_modelo`),
-  UNIQUE KEY `nombre_modelo` (`nombre_modelo`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `tipos_cliente`;
@@ -77,7 +69,7 @@ CREATE TABLE `computadoras` (
   `codigo_bien_nacional` varchar(100) NOT NULL,
   `numero_serial_chasis` varchar(100) NOT NULL,
   `marca` int NOT NULL,
-  `modelo_id` int NOT NULL,
+  `modelo` varchar(50) NOT NULL,
   `color` varchar(30) NOT NULL,
   `direccion_ip` varchar(45) DEFAULT NULL,
   `ubicacion_administrativa` varchar(100) DEFAULT 'Sala de Ciber Center',
@@ -89,11 +81,9 @@ CREATE TABLE `computadoras` (
   UNIQUE KEY `codigo_bien_nacional` (`codigo_bien_nacional`),
   UNIQUE KEY `numero_serial_chasis` (`numero_serial_chasis`),
   UNIQUE KEY `direccion_ip` (`direccion_ip`),
-  KEY `fk_computadoras_modelo` (`modelo_id`),
   KEY `idx_estado` (`estado_operativo`),
   KEY `idx_ip` (`direccion_ip`),
-  CONSTRAINT `computadoras_ibfk_1` FOREIGN KEY (`marca`) REFERENCES `marca` (`id_marca`) ON DELETE RESTRICT ON UPDATE RESTRICT,
-  CONSTRAINT `computadoras_ibfk_2` FOREIGN KEY (`modelo_id`) REFERENCES `modelo` (`id_modelo`) ON DELETE RESTRICT ON UPDATE RESTRICT
+  CONSTRAINT `computadoras_ibfk_1` FOREIGN KEY (`marca`) REFERENCES `marca` (`id_marca`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `perifericos`;
@@ -177,22 +167,6 @@ CREATE TABLE `auditorias_bienes` (
   CONSTRAINT `auditorias_bienes_ibfk_1` FOREIGN KEY (`usuario_auditor_id`) REFERENCES `usuarios` (`id`) ON DELETE RESTRICT ON UPDATE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DROP TABLE IF EXISTS mantenimientos;
-CREATE TABLE IF NOT EXISTS mantenimientos (
-  id int NOT NULL AUTO_INCREMENT,
-  equipo_id int DEFAULT NULL,
-  periferico_id int DEFAULT NULL,
-  fecha_mantenimiento datetime NOT NULL,
-  tipo_mantenimiento enum('preventivo','correctivo') NOT NULL,
-  razon text NOT NULL,
-  diagnostico_correccion text DEFAULT NULL,
-  fecha_registro timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (id),
-  KEY idx_equipo_maint (equipo_id),
-  KEY idx_perif_maint (periferico_id),
-  CONSTRAINT fk_maint_equipo FOREIGN KEY (equipo_id) REFERENCES computadoras (id) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT fk_maint_perif FOREIGN KEY (periferico_id) REFERENCES perifericos (id) ON DELETE SET NULL ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- =====================================================================
 -- 2. TABLAS COMPLEMENTARIAS
 -- =====================================================================
@@ -250,6 +224,23 @@ CREATE TABLE `log_cambios_bienes` (
   CONSTRAINT `log_cambios_bienes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `mantenimientos`;
+CREATE TABLE IF NOT EXISTS `mantenimientos` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `equipo_id` int DEFAULT NULL,
+  `periferico_id` int DEFAULT NULL,
+  `fecha_mantenimiento` datetime NOT NULL,
+  `tipo_mantenimiento` enum('preventivo','correctivo') NOT NULL,
+  `razon` text NOT NULL,
+  `diagnostico_correccion` text DEFAULT NULL,
+  `fecha_registro` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_equipo_maint` (`equipo_id`),
+  KEY `idx_perif_maint` (`periferico_id`),
+  CONSTRAINT `fk_maint_equipo` FOREIGN KEY (`equipo_id`) REFERENCES `computadoras` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_maint_perif` FOREIGN KEY (`periferico_id`) REFERENCES `perifericos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================================
 -- 3. CARGA DE DATOS
 -- =====================================================================
@@ -267,33 +258,21 @@ INSERT INTO `tipos_periferico` (`nombre_componente`) VALUES
 INSERT INTO `tipos_cliente` (`nombre_rol`, `tarifa_por_hora`, `exento_pago`) VALUES
 ('Invitado', 2.50, 0),
 ('Estudiante', 1.50, 0),
-('Profesor', 0.00, 1), 
-('Administrativo', 0.00, 1); 
+('Profesor', 0.00, 1),
+('Administrativo', 0.00, 1);
 
 INSERT INTO `usuarios` (`id`, `nombre_completo`, `cedula_identidad`, `correo_institucional`, `password_hash`, `rol`, `activo`) VALUES
 (1, 'Administrador', '00000000', 'admin@ciber.edu', '$2y$10$zQ8IuFI9B3yHCS6Y9Mqz5OdV/KM7rA3/1j69B0LlHxn0x1vr7r1Om', 'super_admin', 1);
 
-INSERT INTO `modelo` (`id_modelo`, `nombre_modelo`) VALUES
-(1, 'Optiplex 3080'),
-(2, 'ThinkCentre M70q'),
-(3, 'ProDesk 400 G6'),
-(4, 'Optiplex 5090'),
-(5, 'ROG Strix GA15'),
-(6, 'IdeaCentre 5'),
-(7, 'EliteDesk 800'),
-(8, 'Aspire TC'),
-(9, 'MacBook Air'),
-(10, 'iMac 24"');
-
-INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `numero_serial_chasis`, `marca`, `modelo_id`, `color`, `direccion_ip`, `estado_operativo`, `fecha_incorporacion`) VALUES
-(1, 1, 'BIEN-PC-001', 'SN-CHASIS-001', 3, 1, 'Negro', '192.168.1.101', 'disponible', '2026-05-15'),
-(2, 2, 'BIEN-PC-002', 'SN-CHASIS-002', 1, 2, 'Negro', '192.168.1.102', 'disponible', '2026-01-15'),
-(3, 3, 'BIEN-PC-003', 'SN-CHASIS-003', 2, 3, 'Gris Plata', '192.168.1.103', 'disponible', '2026-02-10'),
-(4, 4, 'BIEN-PC-004', 'SN-CHASIS-004', 3, 4, 'Negro', '192.168.1.104', 'disponible', '2026-03-01'),
-(5, 5, 'BIEN-PC-005', 'SN-CHASIS-005', 7, 5, 'Gris Oscuro', '192.168.1.105', 'disponible', '2026-03-15'),
-(6, 6, 'BIEN-PC-006', 'SN-CHASIS-006', 1, 6, 'Negro', '192.168.1.106', 'disponible', '2026-04-20'),
-(7, 7, 'BIEN-PC-007', 'SN-CHASIS-007', 2, 7, 'Negro', '192.168.1.107', 'disponible', '2026-05-02'),
-(8, 8, 'BIEN-PC-008', 'SN-CHASIS-008', 5, 8, 'Negro', '192.168.1.108', 'disponible', '2026-05-10');
+INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `numero_serial_chasis`, `marca`, `modelo`, `color`, `direccion_ip`, `estado_operativo`, `fecha_incorporacion`) VALUES
+(1, 1, 'BIEN-PC-001', 'SN-CHASIS-001', 3, 'Optiplex 3080', 'Negro', '192.168.1.101', 'disponible', '2026-05-15'),
+(2, 2, 'BIEN-PC-002', 'SN-CHASIS-002', 1, 'ThinkCentre M70q', 'Negro', '192.168.1.102', 'disponible', '2026-01-15'),
+(3, 3, 'BIEN-PC-003', 'SN-CHASIS-003', 2, 'ProDesk 400 G6', 'Gris Plata', '192.168.1.103', 'disponible', '2026-02-10'),
+(4, 4, 'BIEN-PC-004', 'SN-CHASIS-004', 3, 'Optiplex 5090', 'Negro', '192.168.1.104', 'disponible', '2026-03-01'),
+(5, 5, 'BIEN-PC-005', 'SN-CHASIS-005', 7, 'ROG Strix GA15', 'Gris Oscuro', '192.168.1.105', 'disponible', '2026-03-15'),
+(6, 6, 'BIEN-PC-006', 'SN-CHASIS-006', 1, 'IdeaCentre 5', 'Negro', '192.168.1.106', 'disponible', '2026-04-20'),
+(7, 7, 'BIEN-PC-007', 'SN-CHASIS-007', 2, 'EliteDesk 800', 'Negro', '192.168.1.107', 'disponible', '2026-05-02'),
+(8, 8, 'BIEN-PC-008', 'SN-CHASIS-008', 5, 'Aspire TC', 'Negro', '192.168.1.108', 'disponible', '2026-05-10');
 
 INSERT INTO `perifericos` (`computadora_id`, `tipo_periferico_id`, `codigo_bien_nacional`, `numero_serial_fabrica`, `marca`, `modelo`, `color`, `estado_fisico`) VALUES
 (1, 1, 'BIEN-MON-001', 'SN-MON-001', 'Dell', 'E2420H', 'Negro', 'excelente'),
@@ -324,9 +303,85 @@ INSERT INTO `configuracion_global` (`clave`, `valor`, `descripcion`) VALUES
 ('notificar_mantenimiento', '1', 'Si está activo, envía alertas de mantenimiento (1/0)');
 
 -- =====================================================================
--- 4. VISTAS (Se definen antes para evitar interferencias de DELIMITER)
+-- 4. FUNCIONES, PROCEDIMIENTOS, VISTAS, TRIGGERS Y EVENTOS
 -- =====================================================================
 
+DELIMITER ;;
+
+DROP FUNCTION IF EXISTS `calcular_costo_sesion`;
+CREATE FUNCTION `calcular_costo_sesion`(p_tarifa_hora DECIMAL(10,2), p_minutos INT)
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+BEGIN
+    DECLARE redondear INT;
+    DECLARE minutos_redondeados INT;
+    SET redondear = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion_global WHERE clave = 'redondear_minutos'), 5);
+    SET minutos_redondeados = CEIL(p_minutos / redondear) * redondear;
+    RETURN ROUND((minutos_redondeados / 60) * p_tarifa_hora, 2);
+END;;
+
+DROP FUNCTION IF EXISTS `aplicar_impuesto`;
+CREATE FUNCTION `aplicar_impuesto`(p_monto DECIMAL(10,2))
+RETURNS DECIMAL(10,2)
+DETERMINISTIC
+BEGIN
+    DECLARE impuesto DECIMAL(5,2);
+    SET impuesto = COALESCE((SELECT CAST(valor AS DECIMAL(5,2)) FROM configuracion_global WHERE clave = 'impuesto_porcentaje'), 16);
+    RETURN ROUND(p_monto * (1 + impuesto/100), 2);
+END;;
+
+DROP PROCEDURE IF EXISTS `sp_cerrar_sesiones_vencidas`;
+CREATE PROCEDURE `sp_cerrar_sesiones_vencidas`()
+BEGIN
+    DECLARE max_horas INT;
+    SET max_horas = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion_global WHERE clave = 'duracion_maxima_sesion_horas'), 4);
+    
+    UPDATE sesiones
+    SET hora_fin = NOW(),
+        estado_transaccion = 'anulado'
+    WHERE hora_fin IS NULL
+      AND estado_transaccion = 'en_curso'
+      AND TIMESTAMPDIFF(HOUR, hora_inicio, NOW()) >= max_horas;
+      
+    UPDATE computadoras c
+    JOIN sesiones s ON c.id = s.computadora_id
+    SET c.estado_operativo = 'disponible'
+    WHERE s.hora_fin IS NOT NULL 
+      AND s.estado_transaccion = 'anulado'
+      AND c.estado_operativo = 'ocupado';
+END;;
+
+DROP PROCEDURE IF EXISTS `sp_cierre_caja`;
+CREATE PROCEDURE `sp_cierre_caja`(IN p_fecha DATE, IN p_id_usuario_cierre INT)
+BEGIN
+    DECLARE total_recaudado DECIMAL(12,2);
+    DECLARE total_sesiones INT;
+    DECLARE minutos_totales INT;
+    
+    SELECT IFNULL(SUM(monto_total_pagado), 0),
+           COUNT(*),
+           IFNULL(SUM(TIMESTAMPDIFF(MINUTE, hora_inicio, hora_fin)), 0)
+    INTO total_recaudado, total_sesiones, minutos_totales
+    FROM sesiones
+    WHERE DATE(hora_inicio) = p_fecha
+      AND estado_transaccion = 'finalizado';
+      
+    INSERT INTO historial (usuario, ip, fyh, sector, acciones)
+    VALUES (
+        (SELECT nombre_completo FROM usuarios WHERE id = p_id_usuario_cierre),
+        'sistema',
+        NOW(),
+        'cierre_caja',
+        CONCAT('Cierre del día ', p_fecha, ': Total recaudado = ', total_recaudado, 
+               ', Sesiones = ', total_sesiones, ', Minutos = ', minutos_totales)
+    );
+    
+    SELECT total_recaudado AS recaudacion, total_sesiones AS sesiones, minutos_totales AS minutos;
+END;;
+
+DELIMITER ;
+
+-- Vistas
 DROP VIEW IF EXISTS `vista_sesiones_activas`;
 CREATE VIEW `vista_sesiones_activas` AS
 SELECT 
@@ -362,16 +417,14 @@ WHERE s.hora_fin IS NOT NULL
 GROUP BY DATE(s.hora_inicio)
 ORDER BY fecha DESC;
 
--- VISTA CORREGIDA: Trae de forma óptima el texto del modelo
 DROP VIEW IF EXISTS `vista_inventario_computadoras`;
 CREATE VIEW `vista_inventario_computadoras` AS
 SELECT 
     c.id AS compu_id,
     c.numero_puesto,
     c.codigo_bien_nacional AS bien_nacional_pc,
-    c.modelo_id,
     m.nombremarca AS pc_marca,
-    mo.nombre_modelo AS pc_modelo,
+    c.modelo AS pc_modelo,
     c.color AS pc_color,
     c.estado_operativo,
     c.direccion_ip,
@@ -379,7 +432,6 @@ SELECT
     GROUP_CONCAT(DISTINCT CONCAT(tp.nombre_componente, ' (', p.marca, ' ', p.modelo, ')') SEPARATOR '; ') AS detalle_perifericos
 FROM computadoras c
 LEFT JOIN marca m ON c.marca = m.id_marca
-LEFT JOIN modelo mo ON c.modelo_id = mo.id_modelo
 LEFT JOIN perifericos p ON c.id = p.computadora_id
 LEFT JOIN tipos_periferico tp ON p.tipo_periferico_id = tp.id
 GROUP BY c.id;
@@ -400,96 +452,16 @@ LEFT JOIN sesiones s ON cl.id = s.cliente_id AND s.estado_transaccion = 'finaliz
 GROUP BY cl.id
 ORDER BY total_gastado DESC;
 
--- =====================================================================
--- 5. FUNCIONES, PROCEDIMIENTOS, TRIGGERS Y EVENTOS (Aislados con //)
--- =====================================================================
+-- Triggers
+DELIMITER ;;
 
-DELIMITER //
-
--- --- FUNCIONES ---
-
-DROP FUNCTION IF EXISTS `calcular_costo_sesion`//
-CREATE FUNCTION `calcular_costo_sesion`(p_tarifa_hora DECIMAL(10,2), p_minutos INT)
-RETURNS DECIMAL(10,2)
-DETERMINISTIC
-BEGIN
-    DECLARE redondear INT;
-    DECLARE minutos_redondeados INT;
-    SET redondear = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion_global WHERE clave = 'redondear_minutos'), 5);
-    SET minutos_redondeados = CEIL(p_minutos / redondear) * redondear;
-    RETURN ROUND((minutos_redondeados / 60) * p_tarifa_hora, 2);
-END//
-
-DROP FUNCTION IF EXISTS `aplicar_impuesto`//
-CREATE FUNCTION `aplicar_impuesto`(p_monto DECIMAL(10,2))
-RETURNS DECIMAL(10,2)
-DETERMINISTIC
-BEGIN
-    DECLARE impuesto DECIMAL(5,2);
-    SET impuesto = COALESCE((SELECT CAST(valor AS DECIMAL(5,2)) FROM configuracion_global WHERE clave = 'impuesto_porcentaje'), 16);
-    RETURN ROUND(p_monto * (1 + impuesto/100), 2);
-END//
-
--- --- PROCEDIMIENTOS ---
-
-DROP PROCEDURE IF EXISTS `sp_cerrar_sesiones_vencidas`//
-CREATE PROCEDURE `sp_cerrar_sesiones_vencidas`()
-BEGIN
-    DECLARE max_horas INT;
-    SET max_horas = COALESCE((SELECT CAST(valor AS UNSIGNED) FROM configuracion_global WHERE clave = 'duracion_maxima_sesion_horas'), 4);
-    
-    UPDATE sesiones
-    SET hora_fin = NOW(),
-        estado_transaccion = 'anulado'
-    WHERE hora_fin IS NULL
-      AND estado_transaccion = 'en_curso'
-      AND TIMESTAMPDIFF(HOUR, hora_inicio, NOW()) >= max_horas;
-      
-    UPDATE computadoras c
-    JOIN sesiones s ON c.id = s.computadora_id
-    SET c.estado_operativo = 'disponible'
-    WHERE s.hora_fin IS NOT NULL 
-      AND s.estado_transaccion = 'anulado'
-      AND c.estado_operativo = 'ocupado';
-END//
-
-DROP PROCEDURE IF EXISTS `sp_cierre_caja`//
-CREATE PROCEDURE `sp_cierre_caja`(IN p_fecha DATE, IN p_id_usuario_cierre INT)
-BEGIN
-    DECLARE total_recaudado DECIMAL(12,2);
-    DECLARE total_sesiones INT;
-    DECLARE minutos_totales INT;
-    
-    SELECT IFNULL(SUM(monto_total_pagado), 0),
-           COUNT(*),
-           IFNULL(SUM(TIMESTAMPDIFF(MINUTE, hora_inicio, hora_fin)), 0)
-    INTO total_recaudado, total_sesiones, minutos_totales
-    FROM sesiones
-    WHERE DATE(hora_inicio) = p_fecha
-      AND estado_transaccion = 'finalizado';
-      
-    INSERT INTO historial (usuario, ip, fyh, sector, acciones)
-    VALUES (
-        (SELECT nombre_completo FROM usuarios WHERE id = p_id_usuario_cierre),
-        'sistema',
-        NOW(),
-        'cierre_caja',
-        CONCAT('Cierre del día ', p_fecha, ': Total recaudado = ', total_recaudado, 
-               ', Sesiones = ', total_sesiones, ', Minutos = ', minutos_totales)
-    );
-    
-    SELECT total_recaudado AS recaudacion, total_sesiones AS sesiones, minutos_totales AS minutos;
-END//
-
--- --- TRIGGERS ---
-
-DROP TRIGGER IF EXISTS `tr_prevent_delete_clientes`//
+DROP TRIGGER IF EXISTS `tr_prevent_delete_clientes`;
 CREATE TRIGGER `tr_prevent_delete_clientes` BEFORE DELETE ON `clientes` FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No se permite eliminar clientes. Use estado_cuenta = suspendido.';
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_audit_computadoras`//
+DROP TRIGGER IF EXISTS `tr_audit_computadoras`;
 CREATE TRIGGER `tr_audit_computadoras` AFTER UPDATE ON `computadoras` FOR EACH ROW
 BEGIN
     DECLARE v_usuario_id INT DEFAULT COALESCE(@usuario_actual, 1);
@@ -497,15 +469,15 @@ BEGIN
         INSERT INTO log_cambios_bienes (tabla_afectada, id_registro, campo_modificado, valor_anterior, valor_nuevo, usuario_id, usuario_ejecutor, accion)
         VALUES ('computadoras', NEW.id, 'estado_operativo', OLD.estado_operativo, NEW.estado_operativo, v_usuario_id, CURRENT_USER(), 'UPDATE');
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_prevent_delete_computadoras`//
+DROP TRIGGER IF EXISTS `tr_prevent_delete_computadoras`;
 CREATE TRIGGER `tr_prevent_delete_computadoras` BEFORE DELETE ON `computadoras` FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No se permite eliminar computadoras. Use estado_operativo = desincorporado.';
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_periferico_unico`//
+DROP TRIGGER IF EXISTS `tr_periferico_unico`;
 CREATE TRIGGER `tr_periferico_unico` BEFORE INSERT ON `perifericos` FOR EACH ROW
 BEGIN
     DECLARE contador INT;
@@ -516,9 +488,9 @@ BEGIN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Ya existe un periférico del mismo tipo asignado a esta computadora';
         END IF;
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_audit_perifericos`//
+DROP TRIGGER IF EXISTS `tr_audit_perifericos`;
 CREATE TRIGGER `tr_audit_perifericos` AFTER UPDATE ON `perifericos` FOR EACH ROW
 BEGIN
     DECLARE v_usuario_id INT DEFAULT COALESCE(@usuario_actual, 1);
@@ -526,9 +498,9 @@ BEGIN
         INSERT INTO log_cambios_bienes (tabla_afectada, id_registro, campo_modificado, valor_anterior, valor_nuevo, usuario_id, usuario_ejecutor, accion)
         VALUES ('perifericos', NEW.id, 'computadora_id', OLD.computadora_id, NEW.computadora_id, v_usuario_id, CURRENT_USER(), 'UPDATE');
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_validar_computadora_disponible`//
+DROP TRIGGER IF EXISTS `tr_validar_computadora_disponible`;
 CREATE TRIGGER `tr_validar_computadora_disponible` BEFORE INSERT ON `sesiones` FOR EACH ROW
 BEGIN
     DECLARE estado_pc VARCHAR(20);
@@ -539,9 +511,9 @@ BEGIN
     IF estado_pc = 'ocupado' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No se puede iniciar sesión: computadora ya ocupada';
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_validar_cliente_activo`//
+DROP TRIGGER IF EXISTS `tr_validar_cliente_activo`;
 CREATE TRIGGER `tr_validar_cliente_activo` BEFORE INSERT ON `sesiones` FOR EACH ROW
 BEGIN
     DECLARE estado_cliente VARCHAR(20);
@@ -549,15 +521,17 @@ BEGIN
     IF estado_cliente = 'suspendido' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Cliente suspendido, no puede usar el servicio';
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_computadora_ocupar`//
+-- NOTA: El trigger de validación de tiempo por hora fue removido para evitar bloqueos innecesarios en reinicios de software cliente.
+
+DROP TRIGGER IF EXISTS `tr_computadora_ocupar`;
 CREATE TRIGGER `tr_computadora_ocupar` AFTER INSERT ON `sesiones` FOR EACH ROW
 BEGIN
     UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = NEW.computadora_id;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_computadora_liberar`//
+DROP TRIGGER IF EXISTS `tr_computadora_liberar`;
 CREATE TRIGGER `tr_computadora_liberar` BEFORE UPDATE ON `sesiones` FOR EACH ROW
 BEGIN
     IF NEW.hora_fin IS NOT NULL AND OLD.hora_fin IS NULL THEN
@@ -565,22 +539,23 @@ BEGIN
         SET estado_operativo = 'disponible'
         WHERE id = NEW.computadora_id AND estado_operativo = 'ocupado';
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_calcular_monto_sesion`//
+DROP TRIGGER IF EXISTS `tr_calcular_monto_sesion`;
 CREATE TRIGGER `tr_calcular_monto_sesion` BEFORE UPDATE ON `sesiones` FOR EACH ROW
 BEGIN
     DECLARE v_minutos INT;
     IF NEW.hora_fin IS NOT NULL AND OLD.hora_fin IS NULL THEN
+        -- CORRECCIÓN: Se calculan los minutos en tiempo real ya que la columna generada STORED aún no está disponible en este punto del ciclo de vida.
         SET v_minutos = TIMESTAMPDIFF(MINUTE, NEW.hora_inicio, NEW.hora_fin);
         IF v_minutos < 0 THEN 
             SET v_minutos = 0; 
         END IF;
         SET NEW.monto_total_pagado = calcular_costo_sesion(NEW.monto_tarifa_aplicada, v_minutos);
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_generar_comprobante`//
+DROP TRIGGER IF EXISTS `tr_generar_comprobante`;
 CREATE TRIGGER `tr_generar_comprobante` BEFORE UPDATE ON `sesiones` FOR EACH ROW
 BEGIN
     DECLARE correlativo INT;
@@ -591,9 +566,9 @@ BEGIN
         WHERE DATE(hora_inicio) = CURDATE() AND comprobante_factura IS NOT NULL;
         SET NEW.comprobante_factura = CONCAT('FAC-', DATE_FORMAT(CURDATE(), '%Y%m%d'), '-', LPAD(correlativo, 5, '0'));
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_proteger_super_admin`//
+DROP TRIGGER IF EXISTS `tr_proteger_super_admin`;
 CREATE TRIGGER `tr_proteger_super_admin` BEFORE UPDATE ON `usuarios` FOR EACH ROW
 BEGIN
     DECLARE total_activos INT;
@@ -603,26 +578,28 @@ BEGIN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No se puede desactivar el único super_admin activo';
         END IF;
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_historial_login_app`//
+DROP TRIGGER IF EXISTS `tr_historial_login_app`;
 CREATE TRIGGER `tr_historial_login_app` AFTER UPDATE ON `usuarios` FOR EACH ROW
 BEGIN
     IF NEW.ultimo_login IS NOT NULL AND OLD.ultimo_login IS NULL THEN
         INSERT INTO historial (usuario, ip, fyh, sector, acciones)
         VALUES (NEW.correo_institucional, 'app_trigger', NOW(), 'autenticacion', 'Inicio de sesión registrado por trigger');
     END IF;
-END//
+END;;
 
-DROP TRIGGER IF EXISTS `tr_prevent_delete_usuarios`//
+DROP TRIGGER IF EXISTS `tr_prevent_delete_usuarios`;
 CREATE TRIGGER `tr_prevent_delete_usuarios` BEFORE DELETE ON `usuarios` FOR EACH ROW
 BEGIN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No se permite eliminar usuarios. Use activo = 0.';
-END//
+END;;
 
--- --- EVENTOS ---
+DELIMITER ;
 
-DROP EVENT IF EXISTS `evento_cierre_automatico`//
+-- Eventos
+DROP EVENT IF EXISTS `evento_cierre_automatico`;
+DELIMITER ;;
 CREATE EVENT `evento_cierre_automatico`
 ON SCHEDULE EVERY 1 DAY STARTS CONCAT(CURDATE(), ' 23:59:59')
 DO
@@ -630,17 +607,16 @@ BEGIN
     CALL sp_cerrar_sesiones_vencidas();
     INSERT INTO historial (usuario, ip, fyh, sector, acciones)
     VALUES ('sistema', '127.0.0.1', NOW(), 'evento_programado', 'Cierre automático de sesiones vencidas');
-END//
+END;;
 
-DROP EVENT IF EXISTS `evento_limpiar_historial`//
+DROP EVENT IF EXISTS `evento_limpiar_historial`;
 CREATE EVENT `evento_limpiar_historial`
 ON SCHEDULE EVERY 1 WEEK STARTS CURRENT_TIMESTAMP + INTERVAL 7 DAY
 DO
 BEGIN
     DELETE FROM historial WHERE fyh < DATE_SUB(NOW(), INTERVAL 3 MONTH);
     DELETE FROM log_cambios_bienes WHERE fecha_cambio < DATE_SUB(NOW(), INTERVAL 6 MONTH);
-END//
-
+END;;
 DELIMITER ;
 
 SET FOREIGN_KEY_CHECKS = 1;
