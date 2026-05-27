@@ -235,21 +235,10 @@ CREATE TABLE `log_cambios_bienes` (
   CONSTRAINT `log_cambios_bienes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 DROP TABLE IF EXISTS `mantenimientos`;
 CREATE TABLE IF NOT EXISTS `mantenimientos` (
   `id` int NOT NULL AUTO_INCREMENT,
-<<<<<<< HEAD
-  `tipo_entidad` enum('Equipo','Periferico') NOT NULL,
-  `entidad_id` int NOT NULL,
-  `fecha_mantenimiento` datetime NOT NULL,
-  `tipo_mantenimiento` enum('Preventivo','Correctivo') NOT NULL,
-  `descripcion_falla` text NOT NULL,
-  `accion_realizada` text DEFAULT NULL,
-  `tecnico_responsable` varchar(150) NOT NULL,
-  `fecha_registro` timestamp NOT NULL DEFAULT current_timestamp(),
-  PRIMARY KEY (`id`),
-  KEY `idx_maint_polymorphic` (`tipo_entidad`,`entidad_id`)
-=======
   `equipo_id` int DEFAULT NULL,
   `periferico_id` int DEFAULT NULL,
   `usuario_id` int DEFAULT NULL,
@@ -258,19 +247,16 @@ CREATE TABLE IF NOT EXISTS `mantenimientos` (
   `razon` text NOT NULL,
   `diagnostico_correccion` text DEFAULT NULL,
   `costo` decimal(10,2) DEFAULT 0.00,
-  `estado` enum('pendiente','en_progreso','finalizado') DEFAULT 'pendiente',  -- Cambiado
+  `estado` varchar(20) NOT NULL DEFAULT 'pendiente',  -- Cambiado de ENUM
   `proxima_revision` date DEFAULT NULL,
-  `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Cambiado a DATETIME
+  `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  KEY `idx_equipo_maint` (`equipo_id`),
-  KEY `idx_perif_maint` (`periferico_id`),
-  KEY `idx_usuario_maint` (`usuario_id`),
-  KEY `idx_estado_fecha` (`estado`, `fecha_mantenimiento`),  -- Nuevo índice para consultas comunes
+  KEY `idx_estado_fecha` (`estado`, `fecha_mantenimiento`),
   CONSTRAINT `fk_maint_equipo` FOREIGN KEY (`equipo_id`) REFERENCES `computadoras` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_maint_perif` FOREIGN KEY (`periferico_id`) REFERENCES `perifericos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
   CONSTRAINT `fk_maint_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `chk_equipo_o_periferico` CHECK ((equipo_id IS NOT NULL OR periferico_id IS NOT NULL))
->>>>>>> acf08e3d97498e9cc99038ef6df32cecee04bb96
+  CONSTRAINT `chk_equipo_o_periferico` CHECK ((equipo_id IS NOT NULL OR periferico_id IS NOT NULL)),
+  CONSTRAINT `chk_estado_valido` CHECK (estado IN ('pendiente', 'en_progreso', 'finalizado'))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 -- =====================================================================
 -- 3. CARGA DE DATOS
