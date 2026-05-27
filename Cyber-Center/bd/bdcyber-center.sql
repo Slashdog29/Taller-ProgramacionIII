@@ -238,7 +238,6 @@ CREATE TABLE `log_cambios_bienes` (
 DROP TABLE IF EXISTS `mantenimientos`;
 CREATE TABLE IF NOT EXISTS `mantenimientos` (
   `id` int NOT NULL AUTO_INCREMENT,
-<<<<<<< HEAD
   `tipo_entidad` enum('Equipo','Periferico') NOT NULL,
   `entidad_id` int NOT NULL,
   `fecha_mantenimiento` datetime NOT NULL,
@@ -249,29 +248,8 @@ CREATE TABLE IF NOT EXISTS `mantenimientos` (
   `fecha_registro` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
   KEY `idx_maint_polymorphic` (`tipo_entidad`,`entidad_id`)
-=======
-  `equipo_id` int DEFAULT NULL,
-  `periferico_id` int DEFAULT NULL,
-  `usuario_id` int DEFAULT NULL,
-  `fecha_mantenimiento` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `tipo_mantenimiento` varchar(50) NOT NULL DEFAULT 'preventivo',
-  `razon` text NOT NULL,
-  `diagnostico_correccion` text DEFAULT NULL,
-  `costo` decimal(10,2) DEFAULT 0.00,
-  `estado` enum('pendiente','en_progreso','finalizado') DEFAULT 'pendiente',  -- Cambiado
-  `proxima_revision` date DEFAULT NULL,
-  `fecha_registro` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,  -- Cambiado a DATETIME
-  PRIMARY KEY (`id`),
-  KEY `idx_equipo_maint` (`equipo_id`),
-  KEY `idx_perif_maint` (`periferico_id`),
-  KEY `idx_usuario_maint` (`usuario_id`),
-  KEY `idx_estado_fecha` (`estado`, `fecha_mantenimiento`),  -- Nuevo índice para consultas comunes
-  CONSTRAINT `fk_maint_equipo` FOREIGN KEY (`equipo_id`) REFERENCES `computadoras` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_maint_perif` FOREIGN KEY (`periferico_id`) REFERENCES `perifericos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_maint_usuario` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `chk_equipo_o_periferico` CHECK ((equipo_id IS NOT NULL OR periferico_id IS NOT NULL))
->>>>>>> acf08e3d97498e9cc99038ef6df32cecee04bb96
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================================
 -- 3. CARGA DE DATOS
 -- =====================================================================
