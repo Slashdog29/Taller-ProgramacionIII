@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         $serial = trim($_POST['serial'] ?? '');
         $bien_nacional = trim($_POST['bien_nacional'] ?? '');
         $marca_id = intval($_POST['marca_id'] ?? 0);
-        $modelo = trim($_POST['modelo'] ?? '');
+        $modelo_id = intval($_POST['modelo_id'] ?? 0);
         $color = trim($_POST['color'] ?? '');
         $perifericos_ids = $_POST['perifericos'] ?? [];
 
@@ -50,13 +50,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         if (empty($bien_nacional)) $bien_nacional = $serial;
 
         if ($action === 'create') {
-            $stmt = $conexion->prepare("INSERT INTO computadoras (numero_puesto, direccion_ip, estado_operativo, codigo_bien_nacional, numero_serial_chasis, marca, modelo, color, fecha_incorporacion) VALUES (?, ?, 'disponible', ?, ?, ?, ?, ?, NOW())");
-            $stmt->bind_param("isssiss", $numero_puesto, $ip_address, $bien_nacional, $serial, $marca_id, $modelo, $color);
+            $stmt = $conexion->prepare("INSERT INTO computadoras (numero_puesto, direccion_ip, estado_operativo, codigo_bien_nacional, numero_serial_chasis, marca, modelo_id, color, fecha_incorporacion) VALUES (?, ?, 'disponible', ?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("isssiis", $numero_puesto, $ip_address, $bien_nacional, $serial, $marca_id, $modelo_id, $color);
             $msg = "Equipo registrado correctamente.";
             $accion_historial = "Registró nuevo equipo: $nombre ($ip_address)";
         } else {
-            $stmt = $conexion->prepare("UPDATE computadoras SET numero_puesto = ?, direccion_ip = ?, codigo_bien_nacional = ?, numero_serial_chasis = ?, marca = ?, modelo = ?, color = ? WHERE id = ?");
-            $stmt->bind_param("isssissi", $numero_puesto, $ip_address, $bien_nacional, $serial, $marca_id, $modelo, $color, $id);
+            $stmt = $conexion->prepare("UPDATE computadoras SET numero_puesto = ?, direccion_ip = ?, codigo_bien_nacional = ?, numero_serial_chasis = ?, marca = ?, modelo_id = ?, color = ? WHERE id = ?");
+            $stmt->bind_param("isssiisi", $numero_puesto, $ip_address, $bien_nacional, $serial, $marca_id, $modelo_id, $color, $id);
             $msg = "Equipo actualizado con éxito.";
             $accion_historial = "Editó equipo ID $id: $nombre ($ip_address)";
         }
@@ -82,6 +82,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         $stmt->bind_param("issss", $id, $fecha, $tipo, $razon, $diagnostico);
         $msg = "Mantenimiento registrado correctamente.";
         $accion_historial = "Registró mantenimiento ($tipo) para equipo ID $id";
+    } elseif ($action === 'create_model') {
+        $nombre_modelo = trim($_POST['nombre_modelo'] ?? '');
+        if (empty($nombre_modelo)) {
+            echo json_encode(['success' => false, 'message' => 'El nombre del modelo es obligatorio.']);
+            exit;
+        }
+        $chk = $conexion->prepare("SELECT id_modelo FROM modelo WHERE nombre_modelo = ?");
+        $chk->bind_param("s", $nombre_modelo);
+        $chk->execute(); $chk->store_result();
+        if ($chk->num_rows > 0) { echo json_encode(['success' => false, 'message' => 'Este modelo ya existe.']); exit; }
+        $chk->close();
+        $stmt = $conexion->prepare("INSERT INTO modelo (nombre_modelo) VALUES (?)");
+        $stmt->bind_param("s", $nombre_modelo);
+        $msg = "Modelo registrado correctamente.";
+        $accion_historial = "Registró nuevo modelo: $nombre_modelo";
     }
 
     if (isset($stmt) && $stmt->execute()) {
@@ -182,6 +197,10 @@ if ($res_alertas) {
 $res_marcas = mysqli_query($conexion, "SELECT * FROM marca ORDER BY nombremarca ASC");
 $marcas_list = [];
 while($m = mysqli_fetch_assoc($res_marcas)) $marcas_list[] = $m;
+
+$res_modelos = mysqli_query($conexion, "SELECT * FROM modelo ORDER BY nombre_modelo ASC");
+$modelos_list = [];
+while($mod = mysqli_fetch_assoc($res_modelos)) $modelos_list[] = $mod;
 
 $perifericos_disponibles = [];
 
@@ -335,6 +354,9 @@ if ($res_p) {
                     <i class="fas fa-search"></i>
                     <input type="text" id="tableSearch" class="form-control" placeholder="Buscar equipo...">
                 </div>
+                <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addModeloModal">
+                    <i class="fas fa-microchip me-2"></i>Registrar Modelo
+                </button>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEquipoModal" onclick="prepareAddModal()">
                     <i class="fas fa-plus me-2"></i>Registrar Equipo
                 </button>
@@ -398,6 +420,7 @@ if ($res_p) {
                             data-bien="<?php echo htmlspecialchars($row['bien_nacional_pc'] ?? ''); ?>"
                             data-marca="<?php echo $row['marca_id']; ?>"
                             data-modelo="<?php echo htmlspecialchars($row['pc_modelo'] ?? ''); ?>"
+                            data-modelo-id="<?php echo $row['modelo_id']; ?>"
                             data-color="<?php echo htmlspecialchars($row['pc_color'] ?? ''); ?>"
                             data-perifericos="<?php echo $row['perifericos_ids']; ?>">
                             
@@ -518,7 +541,12 @@ if ($res_p) {
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Modelo</label>
-                            <input type="text" name="modelo" class="form-control" required>
+                            <select name="modelo_id" class="form-select" required>
+                                <option value="">Seleccione Modelo</option>
+                                <?php foreach($modelos_list as $mod): ?>
+                                    <option value="<?php echo $mod['id_modelo']; ?>"><?php echo htmlspecialchars($mod['nombre_modelo']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Color</label>
@@ -613,7 +641,12 @@ if ($res_p) {
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Modelo</label>
-                            <input type="text" name="modelo" id="edit_modelo" class="form-control" required>
+                            <select name="modelo_id" id="edit_modelo_id" class="form-select" required>
+                                <option value="">Seleccione Modelo</option>
+                                <?php foreach($modelos_list as $mod): ?>
+                                    <option value="<?php echo $mod['id_modelo']; ?>"><?php echo htmlspecialchars($mod['nombre_modelo']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-6 mb-3">
                             <label class="form-label">Color</label>
@@ -662,6 +695,28 @@ if ($res_p) {
                         </div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Guardar Cambios</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addModeloModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content glass-modal">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-plus-circle"></i> Nuevo Modelo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="addModeloForm">
+                    <input type="hidden" name="action" value="create_model">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                    <div class="mb-3">
+                        <label class="form-label">Nombre del Modelo</label>
+                        <input type="text" name="nombre_modelo" class="form-control" placeholder="Ej: Optiplex 3080" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Guardar Modelo</button>
                 </form>
             </div>
         </div>
@@ -810,6 +865,7 @@ if ($res_p) {
     execAction('editEquipoForm', 'editEquipoModal');
     execAction('statusForm', 'statusModal');
     execAction('maintForm', 'modalMantenimiento');
+    execAction('addModeloForm', 'addModeloModal');
 
     const typeSelect = document.getElementById('tipo_mantenimiento');
     const descField = document.getElementById('diagnostico_correccion');
@@ -835,7 +891,7 @@ if ($res_p) {
         document.getElementById('edit_serial').value = r.serial;
         document.getElementById('edit_bien').value = r.bien;
         document.getElementById('edit_marca').value = r.marca;
-        document.getElementById('edit_modelo').value = r.modelo;
+        document.getElementById('edit_modelo_id').value = r.modeloId;
         document.getElementById('edit_color').value = r.color;
         
         const currentId = r.id;
