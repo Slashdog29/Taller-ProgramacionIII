@@ -24,18 +24,14 @@ if (!in_array($entity_type, ['equipo', 'periferico'])) {
     exit;
 }
 
-$sql = "";
-if ($entity_type === 'equipo') {
-    $sql = "SELECT DATE_FORMAT(fecha_mantenimiento, '%d/%m/%Y %H:%i') as fecha_mantenimiento, tipo_mantenimiento, razon, diagnostico_correccion FROM mantenimientos WHERE equipo_id = ? ORDER BY fecha_mantenimiento DESC";
-} elseif ($entity_type === 'periferico') {
-    $sql = "SELECT DATE_FORMAT(fecha_mantenimiento, '%d/%m/%Y %H:%i') as fecha_mantenimiento, tipo_mantenimiento, razon, diagnostico_correccion FROM mantenimientos WHERE periferico_id = ? ORDER BY fecha_mantenimiento DESC";
-}
+$sql = "SELECT DATE_FORMAT(fecha_mantenimiento, '%d/%m/%Y %H:%i') as fecha_mantenimiento, tipo_mantenimiento, descripcion_falla as razon, accion_realizada as diagnostico_correccion FROM mantenimientos WHERE entidad_id = ? AND tipo_entidad = ? ORDER BY fecha_mantenimiento DESC";
 
 $mantenimientos = [];
 try {
     $stmt = $conexion->prepare($sql);
     if ($stmt) {
-        $stmt->bind_param('i', $entity_id);
+        $type_param = ($entity_type === 'equipo') ? 'Equipo' : 'Periferico';
+        $stmt->bind_param('is', $entity_id, $type_param);
         $stmt->execute();
         $result = $stmt->get_result();
         while ($row = $result->fetch_assoc()) {

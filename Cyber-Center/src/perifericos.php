@@ -376,6 +376,9 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                 <i class="fas fa-search"></i>
                 <input type="text" id="tableSearch" class="form-control" placeholder="Buscar periférico...">
             </div>
+            <button class="btn btn-outline-info" onclick="window.open('generar_reporte.php?tipo=mantenimiento', '_blank')" title="Reporte General de Mantenimientos">
+                <i class="fas fa-file-pdf me-2"></i>Mantenimientos
+            </button>
             <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#perifericoModal"><i class="fas fa-plus me-1"></i> Nuevo periférico</button>
             <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#marcaModal"><i class="fas fa-building me-1"></i> Nueva marca</button>
         </div>
@@ -665,6 +668,9 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group" role="group" aria-label="Acciones del dispositivo">
+                                        <a href="generar_reporte.php?tipo=individual&entity_type=periferico&id=<?php echo $row['id']; ?>" target="_blank" class="btn btn-sm btn-outline-primary rounded-circle me-2" title="Reporte Individual">
+                                            <i class="fas fa-file-pdf"></i>
+                                        </a>
                                         <button type="button" class="btn btn-sm btn-outline-info rounded-circle me-2 maint-btn" 
                                                 data-id="<?php echo $row['id']; ?>"
                                                 data-nombre="<?php echo htmlspecialchars(($row['nombre_componente'] ?? 'Periférico') . ' - ' . $row['marca'] . ' ' . $row['modelo']); ?>"

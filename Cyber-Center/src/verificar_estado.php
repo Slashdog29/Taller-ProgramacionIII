@@ -52,10 +52,9 @@ $fin = new DateTime($hora_fin_estimada);
 if ($ahora > $fin) {
     // 1. Finalizar la sesión en la base de datos
     mysqli_query($conexion, "UPDATE sesiones SET estado_transaccion = 'finalizado', hora_fin = NOW() WHERE id = $ses_id");
-    
-    // 2. Liberar la computadora
-    mysqli_query($conexion, "UPDATE computadoras SET estado_operativo = 'disponible' WHERE id = $comp_id");
-    
+
+    // Nota: La liberación de la computadora la hace el trigger tr_computadora_liberar automáticamente.
+
     // 3. Registrar en historial el cierre automático
     $accion_hist = "Sesión ID $ses_id finalizada automáticamente por tiempo agotado (PC-$numero_puesto)";
     $hist_stmt = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES ('Sistema', ?, NOW(), 'Sesiones', ?)");

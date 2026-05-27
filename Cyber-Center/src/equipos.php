@@ -71,15 +71,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         $fecha = $_POST['fecha_mantenimiento'] ?? date('Y-m-d H:i');
         $tipo = $_POST['tipo_mantenimiento'] ?? 'preventivo';
         $razon = trim($_POST['razon'] ?? '');
-        $diagnostico = trim($_POST['diagnostico_correccion'] ?? '');
+        $accion = trim($_POST['diagnostico_correccion'] ?? '');
+        $tecnico = $_SESSION['nombre'] ?? 'Técnico Guardia';
 
         if (empty($razon)) {
             echo json_encode(['success' => false, 'message' => 'La razón del mantenimiento es obligatoria.']);
             exit;
         }
 
-        $stmt = $conexion->prepare("INSERT INTO mantenimientos (equipo_id, fecha_mantenimiento, tipo_mantenimiento, razon, diagnostico_correccion) VALUES (?, ?, ?, ?, ?)");
-        $stmt->bind_param("issss", $id, $fecha, $tipo, $razon, $diagnostico);
+        $stmt = $conexion->prepare("INSERT INTO mantenimientos (tipo_entidad, entidad_id, fecha_mantenimiento, tipo_mantenimiento, descripcion_falla, accion_realizada, tecnico_responsable) VALUES ('Equipo', ?, ?, ?, ?, ?, ?)");
+        $stmt->bind_param("isssss", $id, $fecha, $tipo, $razon, $accion, $tecnico);
         $msg = "Mantenimiento registrado correctamente.";
         $accion_historial = "Registró mantenimiento ($tipo) para equipo ID $id";
     } elseif ($action === 'create_model') {
@@ -88,12 +89,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             echo json_encode(['success' => false, 'message' => 'El nombre del modelo es obligatorio.']);
             exit;
         }
-        $chk = $conexion->prepare("SELECT id_modelo FROM modelo WHERE nombre_modelo = ?");
+        $chk = $conexion->prepare("SELECT id_modelo FROM modelos WHERE nombre_modelo = ?");
         $chk->bind_param("s", $nombre_modelo);
         $chk->execute(); $chk->store_result();
         if ($chk->num_rows > 0) { echo json_encode(['success' => false, 'message' => 'Este modelo ya existe.']); exit; }
         $chk->close();
-        $stmt = $conexion->prepare("INSERT INTO modelo (nombre_modelo) VALUES (?)");
+        $stmt = $conexion->prepare("INSERT INTO modelos (nombre_modelo) VALUES (?)");
         $stmt->bind_param("s", $nombre_modelo);
         $msg = "Modelo registrado correctamente.";
         $accion_historial = "Registró nuevo modelo: $nombre_modelo";
@@ -198,7 +199,7 @@ $res_marcas = mysqli_query($conexion, "SELECT * FROM marca ORDER BY nombremarca 
 $marcas_list = [];
 while($m = mysqli_fetch_assoc($res_marcas)) $marcas_list[] = $m;
 
-$res_modelos = mysqli_query($conexion, "SELECT * FROM modelo ORDER BY nombre_modelo ASC");
+$res_modelos = mysqli_query($conexion, "SELECT * FROM modelos ORDER BY nombre_modelo ASC");
 $modelos_list = [];
 while($mod = mysqli_fetch_assoc($res_modelos)) $modelos_list[] = $mod;
 
@@ -357,6 +358,15 @@ if ($res_p) {
                 <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addModeloModal">
                     <i class="fas fa-microchip me-2"></i>Registrar Modelo
                 </button>
+                <button class="btn btn-outline-info" onclick="window.open('generar_reporte.php?tipo=consolidado', '_blank')" title="Reporte Consolidado de Inventario">
+                    <i class="fas fa-file-pdf me-2"></i>Consolidado
+                </button>
+                <button class="btn btn-outline-info" onclick="window.open('generar_reporte.php?tipo=general', '_blank')" title="Reporte General Básico de Inventario">
+                    <i class="fas fa-file-pdf me-2"></i>General Básico
+                </button>
+                <button class="btn btn-outline-info" onclick="window.open('generar_reporte.php?tipo=mantenimiento', '_blank')" title="Reporte General de Mantenimientos">
+                    <i class="fas fa-file-pdf me-2"></i>Mantenimientos
+                </button>
                 <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEquipoModal" onclick="prepareAddModal()">
                     <i class="fas fa-plus me-2"></i>Registrar Equipo
                 </button>
@@ -457,6 +467,9 @@ if ($res_p) {
                             </td>
                             <td class="text-end">
                                 <div class="btn-group" role="group" aria-label="Acciones del equipo">
+                                    <a href="generar_reporte.php?tipo=individual&entity_type=equipo&id=<?php echo $row['compu_id']; ?>" target="_blank" class="btn btn-sm btn-outline-primary rounded-circle me-2" title="Reporte Individual">
+                                        <i class="fas fa-file-pdf"></i>
+                                    </a>
                                     <button type="button" class="btn btn-sm btn-outline-info rounded-circle me-2 maint-btn" data-id="<?php echo $row['compu_id']; ?>" title="Registrar Mantenimiento">
                                         <i class="fas fa-wrench"></i>
                                     </button>

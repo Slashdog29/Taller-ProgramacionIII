@@ -183,21 +183,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         }
 
         // 5. Insertar sesión
-        $insertSql = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, monto_tarifa_aplicada, estado_transaccion)
-                      VALUES (?, ?, ?, NOW(), ?, 'en_curso')";
+        $insertSql = "INSERT INTO sesiones (cliente_id, computadora_id, usuario_operador_id, hora_inicio, hora_fin_estimada, monto_tarifa_aplicada, estado_transaccion)
+                      VALUES (?, ?, ?, NOW(), DATE_ADD(NOW(), INTERVAL ? MINUTE), ?, 'en_curso')";
         $insertStmt = mysqli_prepare($conexion, $insertSql);
         if ($insertStmt) {
-            mysqli_stmt_bind_param($insertStmt, 'iiid', $id_cliente, $id_computadora, $usuario_operador_id, $tarifa);
+            mysqli_stmt_bind_param($insertStmt, 'iiiid', $id_cliente, $id_computadora, $usuario_operador_id, $duracion, $tarifa);
             if (mysqli_stmt_execute($insertStmt)) {
-                // 6. Actualizar estado de la computadora a ocupado
-                $updateCompSql = "UPDATE computadoras SET estado_operativo = 'ocupado' WHERE id = ?";
-                $updateCompStmt = mysqli_prepare($conexion, $updateCompSql);
-                if ($updateCompStmt) {
-                    mysqli_stmt_bind_param($updateCompStmt, 'i', $id_computadora);
-                    mysqli_stmt_execute($updateCompStmt);
-                    mysqli_stmt_close($updateCompStmt);
-                }
-
                 // 7. Registrar en historial
                 $accion_historial = "Asignó dispositivo al cliente ID {$id_cliente} en computadora ID {$id_computadora} por {$duracion} minutos";
                 $histStmt = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");

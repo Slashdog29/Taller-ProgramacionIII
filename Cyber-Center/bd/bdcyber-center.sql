@@ -26,6 +26,15 @@ CREATE TABLE `marca` (
   UNIQUE KEY `nombremarca` (`nombremarca`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `modelos`;
+CREATE TABLE `modelos` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `nombre_modelo` varchar(50) NOT NULL,
+  `id_marca` int NOT NULL,
+  PRIMARY KEY (`id`),
+  CONSTRAINT `fk_modelo_marca` FOREIGN KEY (`id_marca`) REFERENCES `marca` (`id_marca`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 DROP TABLE IF EXISTS `tipos_periferico`;
 CREATE TABLE `tipos_periferico` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -52,7 +61,7 @@ CREATE TABLE `usuarios` (
   `cedula_identidad` varchar(20) NOT NULL,
   `correo_institucional` varchar(100) NOT NULL,
   `password_hash` varchar(255) NOT NULL,
-  `rol` enum('super_admin','auditor','operador') NOT NULL,
+  `rol` enum('super_admin','Administrador','Operador','Estudiante','Profesor') NOT NULL,
   `activo` tinyint(1) DEFAULT 1,
   `creado_en` timestamp NOT NULL DEFAULT current_timestamp(),
   `ultimo_login` datetime DEFAULT NULL,
@@ -69,11 +78,11 @@ CREATE TABLE `computadoras` (
   `codigo_bien_nacional` varchar(100) NOT NULL,
   `numero_serial_chasis` varchar(100) NOT NULL,
   `marca` int NOT NULL,
-  `modelo` varchar(50) NOT NULL,
+  `modelo_id` int NOT NULL,
   `color` varchar(30) NOT NULL,
   `direccion_ip` varchar(45) DEFAULT NULL,
   `ubicacion_administrativa` varchar(100) DEFAULT 'Sala de Ciber Center',
-  `estado_operativo` enum('disponible','ocupado','mantenimiento','desincorporado') DEFAULT 'disponible',
+  `estado_operativo` enum('disponible','ocupado','En Mantenimiento','Inoperativo','desincorporado') DEFAULT 'disponible',
   `fecha_incorporacion` date NOT NULL,
   `actualizado_en` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -83,7 +92,8 @@ CREATE TABLE `computadoras` (
   UNIQUE KEY `direccion_ip` (`direccion_ip`),
   KEY `idx_estado` (`estado_operativo`),
   KEY `idx_ip` (`direccion_ip`),
-  CONSTRAINT `computadoras_ibfk_1` FOREIGN KEY (`marca`) REFERENCES `marca` (`id_marca`) ON DELETE RESTRICT ON UPDATE RESTRICT
+  CONSTRAINT `computadoras_ibfk_1` FOREIGN KEY (`marca`) REFERENCES `marca` (`id_marca`) ON DELETE RESTRICT ON UPDATE RESTRICT,
+  CONSTRAINT `computadoras_ibfk_2` FOREIGN KEY (`modelo_id`) REFERENCES `modelos` (`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 DROP TABLE IF EXISTS `perifericos`;
@@ -133,6 +143,7 @@ CREATE TABLE `sesiones` (
   `usuario_operador_id` int NOT NULL,
   `hora_inicio` timestamp NOT NULL DEFAULT current_timestamp(),
   `hora_fin` timestamp NULL DEFAULT NULL,
+  `hora_fin_estimada` timestamp NULL DEFAULT NULL,
   `minutos_consumidos` int GENERATED ALWAYS AS (timestampdiff(MINUTE,`hora_inicio`,`hora_fin`)) STORED,
   `monto_tarifa_aplicada` decimal(10,2) NOT NULL,
   `monto_total_pagado` decimal(10,2) DEFAULT 0.00,
@@ -227,18 +238,16 @@ CREATE TABLE `log_cambios_bienes` (
 DROP TABLE IF EXISTS `mantenimientos`;
 CREATE TABLE IF NOT EXISTS `mantenimientos` (
   `id` int NOT NULL AUTO_INCREMENT,
-  `equipo_id` int DEFAULT NULL,
-  `periferico_id` int DEFAULT NULL,
+  `tipo_entidad` enum('Equipo','Periferico') NOT NULL,
+  `entidad_id` int NOT NULL,
   `fecha_mantenimiento` datetime NOT NULL,
-  `tipo_mantenimiento` enum('preventivo','correctivo') NOT NULL,
-  `razon` text NOT NULL,
-  `diagnostico_correccion` text DEFAULT NULL,
+  `tipo_mantenimiento` enum('Preventivo','Correctivo') NOT NULL,
+  `descripcion_falla` text NOT NULL,
+  `accion_realizada` text DEFAULT NULL,
+  `tecnico_responsable` varchar(150) NOT NULL,
   `fecha_registro` timestamp NOT NULL DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  KEY `idx_equipo_maint` (`equipo_id`),
-  KEY `idx_perif_maint` (`periferico_id`),
-  CONSTRAINT `fk_maint_equipo` FOREIGN KEY (`equipo_id`) REFERENCES `computadoras` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
-  CONSTRAINT `fk_maint_perif` FOREIGN KEY (`periferico_id`) REFERENCES `perifericos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+  KEY `idx_maint_polymorphic` (`tipo_entidad`,`entidad_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =====================================================================
@@ -264,15 +273,20 @@ INSERT INTO `tipos_cliente` (`nombre_rol`, `tarifa_por_hora`, `exento_pago`) VAL
 INSERT INTO `usuarios` (`id`, `nombre_completo`, `cedula_identidad`, `correo_institucional`, `password_hash`, `rol`, `activo`) VALUES
 (1, 'Administrador', '00000000', 'admin@ciber.edu', '$2y$10$zQ8IuFI9B3yHCS6Y9Mqz5OdV/KM7rA3/1j69B0LlHxn0x1vr7r1Om', 'super_admin', 1);
 
-INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `numero_serial_chasis`, `marca`, `modelo`, `color`, `direccion_ip`, `estado_operativo`, `fecha_incorporacion`) VALUES
-(1, 1, 'BIEN-PC-001', 'SN-CHASIS-001', 3, 'Optiplex 3080', 'Negro', '192.168.1.101', 'disponible', '2026-05-15'),
-(2, 2, 'BIEN-PC-002', 'SN-CHASIS-002', 1, 'ThinkCentre M70q', 'Negro', '192.168.1.102', 'disponible', '2026-01-15'),
-(3, 3, 'BIEN-PC-003', 'SN-CHASIS-003', 2, 'ProDesk 400 G6', 'Gris Plata', '192.168.1.103', 'disponible', '2026-02-10'),
-(4, 4, 'BIEN-PC-004', 'SN-CHASIS-004', 3, 'Optiplex 5090', 'Negro', '192.168.1.104', 'disponible', '2026-03-01'),
-(5, 5, 'BIEN-PC-005', 'SN-CHASIS-005', 7, 'ROG Strix GA15', 'Gris Oscuro', '192.168.1.105', 'disponible', '2026-03-15'),
-(6, 6, 'BIEN-PC-006', 'SN-CHASIS-006', 1, 'IdeaCentre 5', 'Negro', '192.168.1.106', 'disponible', '2026-04-20'),
-(7, 7, 'BIEN-PC-007', 'SN-CHASIS-007', 2, 'EliteDesk 800', 'Negro', '192.168.1.107', 'disponible', '2026-05-02'),
-(8, 8, 'BIEN-PC-008', 'SN-CHASIS-008', 5, 'Aspire TC', 'Negro', '192.168.1.108', 'disponible', '2026-05-10');
+INSERT INTO `modelos` (`id`, `nombre_modelo`, `id_marca`) VALUES 
+(1, 'Optiplex 3080', 3), (2, 'ThinkCentre M70q', 1), (3, 'ProDesk 400 G6', 2),
+(4, 'Optiplex 5090', 3), (5, 'ROG Strix GA15', 7), (6, 'IdeaCentre 5', 1),
+(7, 'EliteDesk 800', 2), (8, 'Aspire TC', 5);
+
+INSERT INTO `computadoras` (`id`, `numero_puesto`, `codigo_bien_nacional`, `numero_serial_chasis`, `marca`, `modelo_id`, `color`, `direccion_ip`, `estado_operativo`, `fecha_incorporacion`) VALUES
+(1, 1, 'BIEN-PC-001', 'SN-CHASIS-001', 3, 1, 'Negro', '192.168.1.101', 'disponible', '2026-05-15'),
+(2, 2, 'BIEN-PC-002', 'SN-CHASIS-002', 1, 2, 'Negro', '192.168.1.102', 'disponible', '2026-01-15'),
+(3, 3, 'BIEN-PC-003', 'SN-CHASIS-003', 2, 3, 'Gris Plata', '192.168.1.103', 'disponible', '2026-02-10'),
+(4, 4, 'BIEN-PC-004', 'SN-CHASIS-004', 3, 4, 'Negro', '192.168.1.104', 'disponible', '2026-03-01'),
+(5, 5, 'BIEN-PC-005', 'SN-CHASIS-005', 7, 5, 'Gris Oscuro', '192.168.1.105', 'disponible', '2026-03-15'),
+(6, 6, 'BIEN-PC-006', 'SN-CHASIS-006', 1, 6, 'Negro', '192.168.1.106', 'disponible', '2026-04-20'),
+(7, 7, 'BIEN-PC-007', 'SN-CHASIS-007', 2, 7, 'Negro', '192.168.1.107', 'disponible', '2026-05-02'),
+(8, 8, 'BIEN-PC-008', 'SN-CHASIS-008', 5, 8, 'Negro', '192.168.1.108', 'disponible', '2026-05-10');
 
 INSERT INTO `perifericos` (`computadora_id`, `tipo_periferico_id`, `codigo_bien_nacional`, `numero_serial_fabrica`, `marca`, `modelo`, `color`, `estado_fisico`) VALUES
 (1, 1, 'BIEN-MON-001', 'SN-MON-001', 'Dell', 'E2420H', 'Negro', 'excelente'),
@@ -424,7 +438,7 @@ SELECT
     c.numero_puesto,
     c.codigo_bien_nacional AS bien_nacional_pc,
     m.nombremarca AS pc_marca,
-    c.modelo AS pc_modelo,
+    mod.nombre_modelo AS pc_modelo,
     c.color AS pc_color,
     c.estado_operativo,
     c.direccion_ip,
@@ -432,6 +446,7 @@ SELECT
     GROUP_CONCAT(DISTINCT CONCAT(tp.nombre_componente, ' (', p.marca, ' ', p.modelo, ')') SEPARATOR '; ') AS detalle_perifericos
 FROM computadoras c
 LEFT JOIN marca m ON c.marca = m.id_marca
+LEFT JOIN modelos mod ON c.modelo_id = mod.id
 LEFT JOIN perifericos p ON c.id = p.computadora_id
 LEFT JOIN tipos_periferico tp ON p.tipo_periferico_id = tp.id
 GROUP BY c.id;
