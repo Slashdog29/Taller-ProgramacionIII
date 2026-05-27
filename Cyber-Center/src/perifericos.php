@@ -544,9 +544,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                         <div class="col-md-12">
                             <label class="form-label text-white-50 small fw-bold">TIPO DE MANTENIMIENTO</label>
                             <select name="tipo_mantenimiento" id="tipo_mantenimiento" class="form-select" required>
-                                <option value="Preventivo">Preventivo</option>
-                                <option value="Correctivo">Correctivo</option>
-                            </select>
+                                <option value="
                         </div>
                         <div class="col-md-12">
                             <label class="form-label text-white-50 small fw-bold">RAZÓN / MOTIVO</label>
@@ -777,41 +775,6 @@ document.addEventListener('DOMContentLoaded', function(){
         });
     }
 
-    function showMsg(title, msg) {
-        Swal.fire({
-            icon: title.toLowerCase() === 'éxito' ? 'success' : 'error',
-            title: title,
-            text: msg,
-            background: '#1a1d24',
-            color: '#fff',
-            confirmButtonColor: title.toLowerCase() === 'éxito' ? '#00b4d8' : '#e63946',
-            timer: title.toLowerCase() === 'éxito' ? 2500 : undefined,
-            timerProgressBar: title.toLowerCase() === 'éxito',
-            heightAuto: false
-        });
-    }
-
-    async function execAction(formId, modalId) {
-        const form = document.getElementById(formId);
-        if (!form) return;
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const res = await fetch(window.location.href, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-                const data = await res.json();
-                bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
-                if (data.success) { showMsg('Éxito', data.message); setTimeout(() => location.reload(), 1000); }
-                else showMsg('Error', data.message);
-            } catch (error) {
-                showMsg('Error', 'Ocurrió un problema procesando la respuesta del servidor.');
-            }
-        });
-    }
-
-    execAction('perifericoForm', 'perifericoModal');
-    execAction('editPerifericoForm', 'editPerifericoModal');
-    execAction('maintForm', 'modalMantenimiento');
-
     const editButtons = document.querySelectorAll('.btn-edit-periferico');
     editButtons.forEach(btn => {
         btn.addEventListener('click', function() {
@@ -849,10 +812,10 @@ document.addEventListener('DOMContentLoaded', function(){
     const descLabel = document.getElementById('label_diagnostico');
 
     typeSelect?.addEventListener('change', function() {
-        if (this.value.toLowerCase() === 'correctivo') {
+        if (this.value === 'correctivo') {
             descField.setAttribute('required', 'required');
             descField.classList.add('border-info');
-            descLabel.innerHTML = 'DIAGNÓSTICO / CORRECCIÓN <span class="text-info">*</span>';
+            descLabel.innerHTML = 'DIAGNÓSTICO / CORRECCIÓN <span class="text-danger">*</span>';
         } else {
             descField.removeAttribute('required');
             descField.classList.remove('border-info');
@@ -882,8 +845,7 @@ document.addEventListener('DOMContentLoaded', function(){
                     let html = '<div class="timeline">';
                     data.mantenimientos.forEach((maint, index) => {
                         const typeBadge = maint.tipo_mantenimiento.toLowerCase() === 'preventivo' ? 'bg-success' : 'bg-danger';
-                        const invertedClass = index % 2 === 1 ? 'timeline-inverted' : '';
-                        html += `
+                        const invertedClass = index % 2 === 1 ? 'ti
                             <div class="timeline-item ${invertedClass}">
                                 <div class="timeline-badge ${typeBadge}"></div>
                                 <div class="timeline-panel glass-card p-3 mb-3">
