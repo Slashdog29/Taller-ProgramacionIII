@@ -133,6 +133,34 @@ mysqli_stmt_bind_param($stmt_query, "ii", $por_pagina, $offset);
 mysqli_stmt_execute($stmt_query);
 $resultado = mysqli_stmt_get_result($stmt_query);
 
+// --- LÓGICA DE ALERTAS DE PERIFÉRICOS FALTANTES ---
+// Definimos los nombres exactos de las categorías esenciales
+$esenciales = ["Monitor", "Teclado", "Mouse"];
+$equipos_incompletos = [];
+
+/**
+ * Esta consulta genera una matriz de todas las PCs activas contra los 3 tipos esenciales.
+ * Si no existe un registro coincidente en la tabla 'perifericos', significa que falta ese componente.
+ */
+$query_alertas = "
+    SELECT c.id as compu_id, c.numero_puesto, tp.nombre_componente
+    FROM computadoras c
+    CROSS JOIN (
+        SELECT id, nombre_componente 
+        FROM tipos_periferico 
+        WHERE nombre_componente IN ('Monitor', 'Teclado', 'Mouse')
+    ) tp
+    LEFT JOIN perifericos p ON p.computadora_id = c.id AND p.tipo_periferico_id = tp.id
+    WHERE p.id IS NULL AND c.estado_operativo != 'desincorporado'
+    ORDER BY c.numero_puesto ASC, tp.nombre_componente ASC";
+
+$res_alertas = mysqli_query($conexion, $query_alertas);
+if ($res_alertas) {
+    while ($row_a = mysqli_fetch_assoc($res_alertas)) {
+        $equipos_incompletos[] = $row_a;
+    }
+}
+
 $res_marcas = mysqli_query($conexion, "SELECT * FROM marca ORDER BY nombremarca ASC");
 $marcas_list = [];
 while($m = mysqli_fetch_assoc($res_marcas)) $marcas_list[] = $m;
@@ -225,6 +253,30 @@ if ($res_p) {
                 <i class="fas fa-plus me-2"></i>Registrar Equipo
             </button>
         </div>
+
+        <!-- Bloque de Alertas Automáticas (Glassmorphism Warning) -->
+        <?php if (!empty($equipos_incompletos)): ?>
+            <div class="alert mb-4 py-3 px-4" style="background: rgba(255, 193, 7, 0.05); border: 1px solid rgba(255, 193, 7, 0.2); backdrop-filter: blur(10px); border-radius: 15px;">
+                <div class="d-flex align-items-start">
+                    <div class="me-3 mt-1">
+                        <i class="fas fa-bell text-warning animate__animated animate__pulse animate__infinite" style="font-size: 1.2rem;"></i>
+                    </div>
+                    <div>
+                        <h6 class="text-warning fw-bold mb-2" style="letter-spacing: 0.5px;">COMPONENTES FALTANTES DETECTADOS</h6>
+                        <div class="row row-cols-1 row-cols-md-2 g-2">
+                            <?php foreach ($equipos_incompletos as $alerta): ?>
+                                <div class="col">
+                                    <span class="text-white-50 small">
+                                        <i class="fas fa-exclamation-circle me-1 text-warning" style="font-size: 0.7rem;"></i>
+                                        El <strong>PC-<?= str_pad($alerta['numero_puesto'], 2, '0', STR_PAD_LEFT) ?></strong> no tiene un <strong><?= htmlspecialchars($alerta['nombre_componente']) ?></strong> asignado. Rendimiento no óptimo.
+                                    </span>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        <?php endif; ?>
 
         <div class="glass-card p-4">
             <div class="table-responsive">
