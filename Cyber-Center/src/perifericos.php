@@ -255,9 +255,15 @@ $resultado = mysqli_stmt_get_result($stmt_query);
 
 include_once "includes/header.php"; // Incluir el header después de la lógica de procesamiento
 
-$tiposRes = mysqli_query($conexion, "SELECT id, nombre_componente FROM tipos_periferico ORDER BY nombre_componente ASC"); // Se vuelve a consultar para el HTML
-$computadorasRes = mysqli_query($conexion, "SELECT id, numero_puesto, direccion_ip FROM computadoras ORDER BY numero_puesto ASC"); // Se vuelve a consultar para el HTML
-$marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nombremarca ASC"); // Se vuelve a consultar para el HTML
+// Cargar catálogos en arreglos para evitar múltiples consultas y mysqli_data_seek
+$tipos_list = [];
+$res_t = mysqli_query($conexion, "SELECT id, nombre_componente FROM tipos_periferico ORDER BY nombre_componente ASC");
+while ($t = mysqli_fetch_assoc($res_t)) $tipos_list[] = $t;
+
+$computadoras_list = [];
+$res_c = mysqli_query($conexion, "SELECT id, numero_puesto, direccion_ip FROM computadoras ORDER BY numero_puesto ASC");
+while ($c = mysqli_fetch_assoc($res_c)) $computadoras_list[] = $c;
+
 ?>
 
 <style>
@@ -400,18 +406,18 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                             <label class="form-label text-white-50 small fw-bold">TIPO</label>
                             <select name="tipo_periferico_id" class="form-select" required>
                                 <option value="">-- Seleccione --</option>
-                                <?php if ($tiposRes): mysqli_data_seek($tiposRes, 0); while ($t = mysqli_fetch_assoc($tiposRes)): ?>
-                                    <option value="<?php echo intval($t['id']); ?>"><?php echo htmlspecialchars($t['nombre_componente']); ?></option>
-                                <?php endwhile; endif; ?>
+                                <?php foreach ($tipos_list as $t): ?>
+                                    <option value="<?php echo $t['id']; ?>"><?php echo htmlspecialchars($t['nombre_componente']); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">EQUIPO (OPCIONAL)</label>
                             <select name="computadora_id" class="form-select">
                                 <option value="">-- Ninguno --</option>
-                                <?php if ($computadorasRes): mysqli_data_seek($computadorasRes, 0); while ($c = mysqli_fetch_assoc($computadorasRes)): ?>
-                                    <option value="<?php echo intval($c['id']); ?>"><?php echo 'PC-'.str_pad(intval($c['numero_puesto']),2,'0',STR_PAD_LEFT) . ' ' . htmlspecialchars($c['direccion_ip'] ?? ''); ?></option>
-                                <?php endwhile; endif; ?>
+                                <?php foreach ($computadoras_list as $c): ?>
+                                    <option value="<?php echo $c['id']; ?>"><?php echo 'PC-'.str_pad($c['numero_puesto'], 2, '0', STR_PAD_LEFT) . ' ' . htmlspecialchars($c['direccion_ip'] ?? ''); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -470,18 +476,18 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                             <label class="form-label text-white-50 small fw-bold">TIPO</label>
                             <select name="tipo_periferico_id" id="edit_tipo" class="form-select" required>
                                 <option value="">-- Seleccione --</option>
-                                <?php if ($tiposRes): mysqli_data_seek($tiposRes, 0); while ($t = mysqli_fetch_assoc($tiposRes)): ?>
-                                    <option value="<?php echo intval($t['id']); ?>"><?php echo htmlspecialchars($t['nombre_componente']); ?></option>
-                                <?php endwhile; endif; ?>
+                                <?php foreach ($tipos_list as $t): ?>
+                                    <option value="<?php echo $t['id']; ?>"><?php echo htmlspecialchars($t['nombre_componente']); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">EQUIPO (OPCIONAL)</label>
                             <select name="computadora_id" id="edit_computadora" class="form-select">
                                 <option value="">-- Ninguno --</option>
-                                <?php if ($computadorasRes): mysqli_data_seek($computadorasRes, 0); while ($c = mysqli_fetch_assoc($computadorasRes)): ?>
-                                    <option value="<?php echo intval($c['id']); ?>"><?php echo 'PC-'.str_pad(intval($c['numero_puesto']),2,'0',STR_PAD_LEFT) . ' ' . htmlspecialchars($c['direccion_ip'] ?? ''); ?></option>
-                                <?php endwhile; endif; ?>
+                                <?php foreach ($computadoras_list as $c): ?>
+                                    <option value="<?php echo $c['id']; ?>"><?php echo 'PC-'.str_pad($c['numero_puesto'], 2, '0', STR_PAD_LEFT) . ' ' . htmlspecialchars($c['direccion_ip'] ?? ''); ?></option>
+                                <?php endforeach; ?>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -585,9 +591,14 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
 
     <!-- Datalist global para marcas -->
     <datalist id="marcasDataList">
-        <?php if ($marcasRes): mysqli_data_seek($marcasRes, 0); while ($m = mysqli_fetch_assoc($marcasRes)): ?>
-            <option value="<?php echo htmlspecialchars($m['nombremarca']); ?>"></option>
-        <?php endwhile; endif; ?>
+        <?php 
+        $marcas_query = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nombremarca ASC");
+        if ($marcas_query) {
+            while ($m = mysqli_fetch_assoc($marcas_query)) {
+                echo '<option value="' . htmlspecialchars($m['nombremarca']) . '"></option>';
+            }
+        }
+        ?>
     </datalist>
 
     <!-- Modal Marca -->
@@ -733,37 +744,6 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
-    // Helper para mostrar mensajes
-    function showMsg(title, msg) {
-        document.getElementById('messageModalTitle').innerText = title;
-        document.getElementById('messageModalBody').innerHTML = msg;
-        new bootstrap.Modal(document.getElementById('messageModal')).show();
-    }
-
-    // Función universal para ejecutar acciones AJAX con alertas
-    async function execAction(formId, modalId) {
-        const form = document.getElementById(formId);
-        if (!form) return;
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            try {
-                const res = await fetch(window.location.href, { 
-                    method: 'POST', 
-                    body: new FormData(form), 
-                    headers: { 'X-Requested-With': 'XMLHttpRequest' } 
-                });
-                const data = await res.json();
-                const modalInstance = bootstrap.Modal.getInstance(document.getElementById(modalId));
-                if (modalInstance) modalInstance.hide();
-                
-                if (data.success) { showMsg('Éxito', data.message); setTimeout(() => location.reload(), 1000); }
-                else showMsg('Error', data.message);
-            } catch (error) {
-                showMsg('Error', 'Ocurrió un problema procesando la respuesta del servidor.');
-            }
-        });
-    }
-
     // Lógica del Buscador
     const searchInput = document.getElementById('tableSearch');
     if (searchInput) {
@@ -798,8 +778,13 @@ document.addEventListener('DOMContentLoaded', function(){
             e.preventDefault();
             try {
                 const res = await fetch(window.location.href, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!res.ok) throw new Error('Error en la respuesta del servidor');
+                
                 const data = await res.json();
-                bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+                const modalElement = document.getElementById(modalId);
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) modalInstance.hide();
+
                 if (data.success) { showMsg('Éxito', data.message); setTimeout(() => location.reload(), 1000); }
                 else showMsg('Error', data.message);
             } catch (error) {
@@ -838,11 +823,6 @@ document.addEventListener('DOMContentLoaded', function(){
             new bootstrap.Modal(document.getElementById('modalMantenimiento')).show();
         });
     });
-
-    // Registro de manejadores de formularios
-    execAction('perifericoForm', 'perifericoModal');
-    execAction('editPerifericoForm', 'editPerifericoModal');
-    execAction('maintForm', 'modalMantenimiento');
 
     const typeSelect = document.getElementById('tipo_mantenimiento');
     const descField = document.getElementById('diagnostico_correccion');
