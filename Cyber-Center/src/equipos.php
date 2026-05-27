@@ -882,9 +882,17 @@ if ($res_p) {
     });
 
     function showMsg(title, msg) {
-        document.getElementById('messageModalTitle').innerText = title;
-        document.getElementById('messageModalBody').innerHTML = msg;
-        new bootstrap.Modal(document.getElementById('messageModal')).show();
+        Swal.fire({
+            icon: title.toLowerCase() === 'éxito' ? 'success' : 'error',
+            title: title,
+            text: msg,
+            background: '#1a1d24',
+            color: '#fff',
+            confirmButtonColor: title.toLowerCase() === 'éxito' ? '#00b4d8' : '#e63946',
+            timer: title.toLowerCase() === 'éxito' ? 2500 : undefined,
+            timerProgressBar: title.toLowerCase() === 'éxito',
+            heightAuto: false
+        });
     }
 
     async function execAction(formId, modalId) {
@@ -923,10 +931,10 @@ if ($res_p) {
     const descLabel = document.getElementById('label_diagnostico');
 
     typeSelect?.addEventListener('change', function() {
-        if (this.value === 'correctivo') {
+        if (this.value.toLowerCase() === 'correctivo') {
             descField.setAttribute('required', 'required');
             descField.classList.add('border-info');
-            descLabel.innerHTML = 'DIAGNÓSTICO / CORRECCIÓN <span class="text-danger">*</span>';
+            descLabel.innerHTML = 'DIAGNÓSTICO / CORRECCIÓN <span class="text-info">*</span>';
         } else {
             descField.removeAttribute('required');
             descField.classList.remove('border-info');
