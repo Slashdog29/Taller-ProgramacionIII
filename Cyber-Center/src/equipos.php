@@ -897,13 +897,22 @@ if ($res_p) {
 
     async function execAction(formId, modalId) {
         const form = document.getElementById(formId);
+        if (!form) return;
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             try {
                 const res = await fetch(window.location.href, { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+                if (!res.ok) throw new Error('Error en la respuesta del servidor');
+                
                 const data = await res.json();
-                bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
-                if (data.success) { showMsg('Éxito', data.message); setTimeout(() => location.reload(), 1000); }
+                const modalElement = document.getElementById(modalId);
+                const modalInstance = bootstrap.Modal.getInstance(modalElement);
+                if (modalInstance) modalInstance.hide();
+
+                if (data.success) { 
+                    showMsg('Éxito', data.message); 
+                    setTimeout(() => location.reload(), 1000); 
+                }
                 else showMsg('Error', data.message);
             } catch (error) {
                 showMsg('Error', 'Ocurrió un problema procesando la respuesta del servidor.');

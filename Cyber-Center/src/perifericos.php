@@ -395,6 +395,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                 <div class="modal-body">
                     <form id="perifericoForm" class="row g-3">
                         <input type="hidden" name="action" value="create_periferico">
+                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">TIPO</label>
                             <select name="tipo_periferico_id" class="form-select" required>
@@ -463,6 +464,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                     <form id="editPerifericoForm" class="row g-3">
                         <input type="hidden" name="action" value="update_periferico">
                         <input type="hidden" name="id" id="edit_id">
+                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">TIPO</label>
@@ -533,6 +535,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                         <input type="hidden" name="action" value="register_maintenance">
                         <input type="hidden" name="id" id="maint_entity_id">
                         <input type="hidden" name="tipo_entidad" value="periferico">
+                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                         <p class="text-white-50">Componente: <strong id="maint_display_name" class="text-white"></strong></p>
                         <div class="col-md-12">
                             <label class="form-label text-white-50 small fw-bold">FECHA DE MANTENIMIENTO</label>
@@ -611,6 +614,9 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
             </div>
         </div>
     </div>
+
+    <!-- Modal de Mensajes Globales -->
+    <div class="modal fade" id="messageModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content glass-modal"><div class="modal-header"><h5 class="modal-title" id="messageModalTitle">Aviso</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="messageModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button></div></div></div></div>
 
     <!-- Tabla de resultados -->
     <div class="glass-card">
@@ -727,6 +733,37 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
+    // Helper para mostrar mensajes
+    function showMsg(title, msg) {
+        document.getElementById('messageModalTitle').innerText = title;
+        document.getElementById('messageModalBody').innerHTML = msg;
+        new bootstrap.Modal(document.getElementById('messageModal')).show();
+    }
+
+    // Función universal para ejecutar acciones AJAX con alertas
+    async function execAction(formId, modalId) {
+        const form = document.getElementById(formId);
+        if (!form) return;
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            try {
+                const res = await fetch(window.location.href, { 
+                    method: 'POST', 
+                    body: new FormData(form), 
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' } 
+                });
+                const data = await res.json();
+                const modalInstance = bootstrap.Modal.getInstance(document.getElementById(modalId));
+                if (modalInstance) modalInstance.hide();
+                
+                if (data.success) { showMsg('Éxito', data.message); setTimeout(() => location.reload(), 1000); }
+                else showMsg('Error', data.message);
+            } catch (error) {
+                showMsg('Error', 'Ocurrió un problema procesando la respuesta del servidor.');
+            }
+        });
+    }
+
     // Lógica del Buscador
     const searchInput = document.getElementById('tableSearch');
     if (searchInput) {
@@ -801,6 +838,11 @@ document.addEventListener('DOMContentLoaded', function(){
             new bootstrap.Modal(document.getElementById('modalMantenimiento')).show();
         });
     });
+
+    // Registro de manejadores de formularios
+    execAction('perifericoForm', 'perifericoModal');
+    execAction('editPerifericoForm', 'editPerifericoModal');
+    execAction('maintForm', 'modalMantenimiento');
 
     const typeSelect = document.getElementById('tipo_mantenimiento');
     const descField = document.getElementById('diagnostico_correccion');
