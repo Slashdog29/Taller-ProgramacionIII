@@ -236,22 +236,34 @@ if ($res_p) {
         border-color: #0d6efd !important;
         color: white !important;
     }
-    .pagination .page-item.disabled .page-link {
-        background: rgba(0, 0, 0, 0.3) !important;
-        color: rgba(255, 255, 255, 0.2) !important;
-        border-color: rgba(255, 255, 255, 0.05) !important;
+    .pagination .page-item.disabled .page-link { background: rgba(0, 0, 0, 0.3) !important; color: rgba(255, 255, 255, 0.2) !important; border-color: rgba(255, 255, 255, 0.05) !important; }
+
+    /* Buscador Adaptado */
+    .search-wrapper { position: relative; min-width: 250px; }
+    .search-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: rgba(255, 255, 255, 0.4); z-index: 5; }
+    .search-wrapper .form-control { 
+        background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+        border-radius: 12px !important; padding-left: 45px !important; color: #ffffff !important; 
     }
+    .search-wrapper .form-control::placeholder { color: rgba(255, 255, 255, 0.6) !important; }
+    .search-wrapper .form-control:focus { border-color: var(--primary-light) !important; box-shadow: 0 0 15px rgba(13, 110, 253, 0.1) !important; }
 </style>
 
     <div class="container main-content pb-5">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
             <div>
                 <h2 class="fw-bold mb-0 text-white">Gestión de Equipos</h2>
                 <p class="text-white-50">Inventario y estado de estaciones de trabajo</p>
             </div>
-            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEquipoModal" onclick="prepareAddModal()">
-                <i class="fas fa-plus me-2"></i>Registrar Equipo
-            </button>
+            <div class="d-flex flex-wrap gap-2">
+                <div class="search-wrapper">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="tableSearch" class="form-control" placeholder="Buscar equipo...">
+                </div>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addEquipoModal" onclick="prepareAddModal()">
+                    <i class="fas fa-plus me-2"></i>Registrar Equipo
+                </button>
+            </div>
         </div>
 
         <!-- Bloque de Alertas Automáticas (Glassmorphism Warning) -->
@@ -586,7 +598,20 @@ if ($res_p) {
 <div class="modal fade" id="messageModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content glass-modal"><div class="modal-header"><h5 class="modal-title" id="messageModalTitle">Aviso</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="messageModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-primary" data-bs-dismiss="modal">OK</button></div></div></div></div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', function() {
+        // Lógica del Buscador
+        const searchInput = document.getElementById('tableSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase();
+                const rows = document.querySelectorAll('table.table tbody tr');
+                rows.forEach(row => {
+                    if (row.cells.length === 1) return;
+                    row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
+                });
+            });
+        }
+
         var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
         var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
             return new bootstrap.Tooltip(tooltipTriggerEl)

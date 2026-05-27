@@ -134,13 +134,27 @@ if (!$resultado) {
     tr.highlighted { background: rgba(124,58,237,0.12) !important; }
     tr.dimmed { opacity: 0.28; }
     .clickable-card.active-filter { outline: 2px solid rgba(124,58,237,0.18); box-shadow: 0 8px 24px rgba(124,58,237,0.12); }
+
+    /* Buscador Adaptado */
+    .search-wrapper { position: relative; min-width: 280px; }
+    .search-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: rgba(255, 255, 255, 0.4); z-index: 5; }
+    .search-wrapper .form-control { 
+        background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+        border-radius: 12px !important; padding-left: 45px !important; color: #ffffff !important; 
+    }
+    .search-wrapper .form-control::placeholder { color: rgba(255, 255, 255, 0.6) !important; }
+    .search-wrapper .form-control:focus { border-color: var(--primary-light) !important; box-shadow: 0 0 15px rgba(13, 110, 253, 0.1) !important; }
 </style>
 
 <div class="container main-content pb-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
             <h2 class="fw-bold mb-0 text-white">Gestión de Sesiones</h2>
             <p class="text-white-50">Listado completo de sesiones: activas, finalizadas y anuladas.</p>
+        </div>
+        <div class="search-wrapper">
+            <i class="fas fa-search"></i>
+            <input type="text" id="tableSearch" class="form-control" placeholder="Buscar en historial de sesiones...">
         </div>
     </div>
 
@@ -516,7 +530,20 @@ if (!$resultado) {
         });
     }
 
-    document.addEventListener('DOMContentLoaded', function(){
+    document.addEventListener('DOMContentLoaded', function() {
+        // Lógica del Buscador
+        const searchInput = document.getElementById('tableSearch');
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase();
+                const rows = document.querySelectorAll('table.table tbody tr');
+                rows.forEach(row => {
+                    if (row.cells.length === 1) return;
+                    row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
+                });
+            });
+        }
+
         attachSessionHandlers();
         attachCardFilters();
     });

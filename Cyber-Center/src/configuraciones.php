@@ -314,26 +314,46 @@ if ($action === 'historial') {
 }
 
 if ($action === 'transacciones') {
+    $mes = $_GET['mes'] ?? date('Y-m');
     $rows = [];
-    $result = mysqli_query($conexion, "SELECT usuario, fyh, sector, acciones FROM historial ORDER BY fyh DESC LIMIT 50");
-    while ($row = mysqli_fetch_assoc($result)) {
-        $tipo = 'Operación';
-        $lower = mb_strtolower($row['acciones']);
-        if (strpos($lower, 'respaldo') !== false) {
-            $tipo = 'Respaldo';
-        } elseif (strpos($lower, 'restaur') !== false) {
-            $tipo = 'Restauración';
-        } elseif (strpos($lower, 'cambió contraseña') !== false || strpos($lower, 'contraseña') !== false) {
-            $tipo = 'Seguridad';
-        }
-        $rows[] = [
-            'tipo' => $tipo,
-            'descripcion' => $row['acciones'],
-            'usuario' => $row['usuario'],
-            'fecha' => $row['fyh'],
-        ];
+
+    // Calcular Total del mes seleccionado
+    $stmt_total = $conexion->prepare("SELECT COALESCE(SUM(monto_total_pagado), 0) as total FROM sesiones WHERE estado_transaccion = 'finalizado' AND DATE_FORMAT(hora_fin, '%Y-%m') = ?");
+    $stmt_total->bind_param("s", $mes);
+    $stmt_total->execute();
+    $total_mes = $stmt_total->get_result()->fetch_assoc()['total'];
+    $stmt_total->close();
+
+    // Calcular Total del día actual (siempre hoy)
+    $hoy = date('Y-m-d');
+    $res_hoy = $conexion->query("SELECT COALESCE(SUM(monto_total_pagado), 0) as total FROM sesiones WHERE estado_transaccion = 'finalizado' AND DATE(hora_fin) = '$hoy'");
+    $total_dia = $res_hoy->fetch_assoc()['total'];
+
+    // Consultar detalle de ingresos del mes solicitado
+    $query = "SELECT s.hora_fin as fecha, 
+                     CONCAT(c.nombre, ' ', c.apellido) as cliente, 
+                     CONCAT('PC-', LPAD(comp.numero_puesto, 2, '0')) as computadora, 
+                     u.nombre_completo as usuario, 
+                     s.monto_total_pagado as monto
+              FROM sesiones s
+              LEFT JOIN clientes c ON s.cliente_id = c.id
+              LEFT JOIN computadoras comp ON s.computadora_id = comp.id
+              LEFT JOIN usuarios u ON s.usuario_operador_id = u.id
+              WHERE s.estado_transaccion = 'finalizado' 
+                AND DATE_FORMAT(s.hora_fin, '%Y-%m') = ?
+              ORDER BY s.hora_fin DESC";
+
+    $stmt_data = $conexion->prepare($query);
+    $stmt_data->bind_param("s", $mes);
+    $stmt_data->execute();
+    $res_data = $stmt_data->get_result();
+
+    while ($row = $res_data->fetch_assoc()) {
+        $rows[] = $row;
     }
-    echo json_encode(['success' => true, 'data' => $rows]);
+    $stmt_data->close();
+
+    echo json_encode(['success' => true, 'data' => $rows, 'total_mes' => $total_mes, 'total_dia' => $total_dia]);
     exit;
 }
 

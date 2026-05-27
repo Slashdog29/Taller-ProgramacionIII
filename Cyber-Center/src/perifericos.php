@@ -240,14 +240,21 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
         border-color: #0d6efd !important;
         color: white !important;
     }
-    .pagination .page-item.disabled .page-link {
-        background: rgba(0, 0, 0, 0.3) !important;
-        color: rgba(255, 255, 255, 0.2) !important;
+    .pagination .page-item.disabled .page-link { background: rgba(0, 0, 0, 0.3) !important; color: rgba(255, 255, 255, 0.2) !important; }
+
+    /* Buscador Adaptado */
+    .search-wrapper { position: relative; min-width: 250px; }
+    .search-wrapper i { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: rgba(255, 255, 255, 0.4); z-index: 5; }
+    .search-wrapper .form-control { 
+        background: rgba(15, 23, 42, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; 
+        border-radius: 12px !important; padding-left: 45px !important; color: #ffffff !important; 
     }
+    .search-wrapper .form-control::placeholder { color: rgba(255, 255, 255, 0.6) !important; }
+    .search-wrapper .form-control:focus { border-color: var(--primary-light) !important; box-shadow: 0 0 15px rgba(13, 110, 253, 0.1) !important; }
 </style>
 
 <div class="container main-content pb-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
             <h2 class="fw-bold mb-0 text-white">Gestión de Periféricos</h2>
             <p class="text-white-50">Control de hardware y componentes externos</p>
@@ -255,7 +262,11 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                 <div class="alert alert-danger mt-2 py-2 px-3 fw-bold"><?php echo htmlspecialchars($mensaje); ?></div>
             <?php endif; ?>
         </div>
-        <div>
+        <div class="d-flex flex-wrap gap-2">
+            <div class="search-wrapper">
+                <i class="fas fa-search"></i>
+                <input type="text" id="tableSearch" class="form-control" placeholder="Buscar periférico...">
+            </div>
             <button class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#perifericoModal"><i class="fas fa-plus me-1"></i> Nuevo periférico</button>
             <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#marcaModal"><i class="fas fa-building me-1"></i> Nueva marca</button>
         </div>
@@ -515,6 +526,19 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
 
 <script>
 document.addEventListener('DOMContentLoaded', function(){
+    // Lógica del Buscador
+    const searchInput = document.getElementById('tableSearch');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            const rows = document.querySelectorAll('table.table tbody tr');
+            rows.forEach(row => {
+                if (row.cells.length === 1) return; 
+                row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
+            });
+        });
+    }
+
     const editButtons = document.querySelectorAll('.btn-edit-periferico');
     editButtons.forEach(btn => {
         btn.addEventListener('click', function() {

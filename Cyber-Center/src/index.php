@@ -109,7 +109,7 @@ if ($resAct) {
     <!-- Ingresos -->
     <div class="row g-3 mb-4">
         <div class="col-md-6">
-            <div class="glass-card stat-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.15), transparent);">
+            <div class="glass-card stat-card" style="background: linear-gradient(135deg, rgba(16,185,129,0.15), transparent); cursor: pointer;" data-bs-toggle="modal" data-bs-target="#ingresosMesModal">
                 <div class="d-flex justify-content-between">
                     <div><div class="stat-title">Ingresos Hoy</div><div class="stat-value">$ <?php echo number_format($ingresosHoy,2); ?></div><div class="small text-white-50"><?php echo date('d/m/Y'); ?></div></div>
                     <div class="stat-icon"><i class="fas fa-coins"></i></div>
@@ -117,7 +117,7 @@ if ($resAct) {
             </div>
         </div>
         <div class="col-md-6">
-            <div class="glass-card stat-card" style="background: linear-gradient(135deg, rgba(79,70,229,0.15), transparent);">
+            <div class="glass-card stat-card" style="background: linear-gradient(135deg, rgba(79,70,229,0.15), transparent); cursor: pointer;" data-bs-toggle="modal" data-bs-target="#ingresosMesModal">
                 <div class="d-flex justify-content-between">
                     <div><div class="stat-title">Ingresos del Mes</div><div class="stat-value">$ <?php echo number_format($ingresosMes,2); ?></div><div class="small text-white-50"><?php echo date('F Y'); ?></div></div>
                     <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
@@ -168,6 +168,59 @@ if ($resAct) {
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Reporte de Ingresos Mensuales -->
+<div class="modal fade" id="ingresosMesModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content glass-modal">
+            <div class="modal-header border-bottom-0">
+                <h5 class="modal-title text-white"><i class="fas fa-receipt me-2"></i> Reporte de Ingresos Mensuales</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row g-3 mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label text-white-50 small fw-bold">FILTRAR POR MES</label>
+                        <input type="month" id="mesFiltroIngresos" class="form-control bg-dark border-secondary text-white" value="<?php echo date('Y-m'); ?>">
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded bg-primary bg-opacity-10 border border-primary border-opacity-25 h-100 d-flex flex-column justify-content-center">
+                            <span class="text-white-50 small fw-bold">TOTAL MES SELECCIONADO</span>
+                            <span class="fs-4 fw-bold text-white" id="totalIngresosMes">$ 0.00</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="p-3 rounded bg-success bg-opacity-10 border border-success border-opacity-25 h-100 d-flex flex-column justify-content-center">
+                            <span class="text-white-50 small fw-bold">TOTAL INGRESOS HOY</span>
+                            <span class="fs-4 fw-bold text-white" id="totalIngresosHoy">$ 0.00</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="table-responsive" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover align-middle">
+                        <thead class="sticky-top bg-dark">
+                            <tr>
+                                <th class="text-primary-light">#</th>
+                                <th class="text-primary-light">FECHA / HORA</th>
+                                <th class="text-primary-light">CLIENTE</th>
+                                <th class="text-primary-light">EQUIPO</th>
+                                <th class="text-primary-light">OPERADOR</th>
+                                <th class="text-end text-primary-light">MONTO</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingresosTableBody">
+                            <!-- Los datos se cargan dinámicamente mediante dashboard.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer border-top-0">
+                <button type="button" class="btn btn-outline-light rounded-pill px-4" data-bs-dismiss="modal">Cerrar</button>
             </div>
         </div>
     </div>
