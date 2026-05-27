@@ -67,6 +67,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
         $stmt->bind_param("si", $nuevo_estado, $id);
         $msg = "Estado del equipo actualizado.";
         $accion_historial = "Cambió estado de equipo ID $id a: $nuevo_estado";
+    } elseif ($action === 'register_maintenance') {
+        $fecha = $_POST['fecha_mantenimiento'] ?? date('Y-m-d H:i');
+        $tipo = $_POST['tipo_mantenimiento'] ?? 'preventivo';
+        $razon = trim($_POST['razon'] ?? '');
+        $diagnostico = trim($_POST['diagnostico_correccion'] ?? '');
+
+        if (empty($razon)) {
+            echo json_encode(['success' => false, 'message' => 'La razón del mantenimiento es obligatoria.']);
+            exit;
+        }
+
+        $stmt = $conexion->prepare("INSERT INTO mantenimientos (equipo_id, fecha_mantenimiento, tipo_mantenimiento, razon, diagnostico_correccion) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("issss", $id, $fecha, $tipo, $razon, $diagnostico);
+        $msg = "Mantenimiento registrado correctamente.";
+        $accion_historial = "Registró mantenimiento ($tipo) para equipo ID $id";
     }
 
     if (isset($stmt) && $stmt->execute()) {
@@ -122,10 +137,13 @@ $total_registros = mysqli_fetch_assoc($total_res)['total'];
 $total_paginas = ceil($total_registros / $por_pagina);
 
 // 2. Consulta principal con LIMIT y OFFSET usando sentencias preparadas
-$query = "SELECT v.*, c.numero_serial_chasis, c.marca as marca_id, 
-          (SELECT GROUP_CONCAT(id) FROM perifericos WHERE computadora_id = v.compu_id) as perifericos_ids 
-          FROM vista_inventario_computadoras v 
-          JOIN computadoras c ON v.compu_id = c.id 
+$query = "SELECT v.*, c.numero_serial_chasis, c.marca as marca_id,
+          (SELECT GROUP_CONCAT(id) FROM perifericos WHERE computadora_id = v.compu_id) as perifericos_ids,
+          COUNT(m.id) AS total_mantenimientos
+          FROM vista_inventario_computadoras v
+          JOIN computadoras c ON v.compu_id = c.id
+          LEFT JOIN mantenimientos m ON v.compu_id = m.equipo_id
+          GROUP BY v.compu_id
           ORDER BY v.numero_puesto ASC LIMIT ? OFFSET ?";
 
 $stmt_query = mysqli_prepare($conexion, $query);
@@ -249,6 +267,63 @@ if ($res_p) {
     .search-wrapper .form-control:focus { border-color: var(--primary-light) !important; box-shadow: 0 0 15px rgba(13, 110, 253, 0.1) !important; }
 </style>
 
+<style>
+    /* Timeline styles for maintenance history */
+    .timeline {
+        position: relative;
+        padding: 20px 0;
+        list-style: none;
+    }
+    .timeline:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        margin-left: -1px;
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    .timeline-item {
+        margin-bottom: 20px;
+        position: relative;
+    }
+    .timeline-item:before, .timeline-item:after {
+        content: " ";
+        display: table;
+    }
+    .timeline-item:after {
+        clear: both;
+    }
+    .timeline-badge {
+        color: #fff;
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        font-size: 1.4em;
+        text-align: center;
+        position: absolute;
+        top: 16px;
+        left: 50%;
+        margin-left: -12px;
+        background-color: #999999;
+        z-index: 100;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    .timeline-panel {
+        width: 45%;
+        float: left;
+        border-radius: 12px;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(15, 23, 42, 0.7); /* glass-modal background */
+        backdrop-filter: blur(10px);
+    }
+    .timeline-item.timeline-inverted .timeline-panel {
+        float: right;
+    }
+</style>
     <div class="container main-content pb-5">
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
             <div>
@@ -300,6 +375,7 @@ if ($res_p) {
                             <th>SERIAL / CHASIS</th>
                             <th>DIRECCIÓN IP</th>
                             <th>ESTADO</th>
+                            <th>MANTENIMIENTOS</th>
                             <th>PERIFÉRICOS</th>
                             <th class="text-end">ACCIONES</th>
                         </tr>
@@ -338,6 +414,16 @@ if ($res_p) {
                                 </span>
                             </td>
                             <td>
+                                <?php
+                                    $maint_count = intval($row['total_mantenimientos']);
+                                    $maint_text_class = ($maint_count > 3) ? 'text-warning' : 'text-white-50';
+                                ?>
+                                <span class="badge bg-dark border border-secondary <?php echo $maint_text_class; ?>">
+                                    <?php echo $maint_count; ?> veces
+                                </span>
+                            </td>
+
+                            <td>
                                 <span class="badge bg-dark border border-secondary" 
                                       data-bs-toggle="tooltip" 
                                       data-bs-placement="top" 
@@ -347,9 +433,23 @@ if ($res_p) {
                                 </span>
                             </td>
                             <td class="text-end">
-                                <div class="btn-group">
-                                    <button class="btn btn-sm btn-outline-light rounded-pill me-2 edit-btn" title="Editar"><i class="fas fa-edit"></i></button>
-                                    <button class="btn btn-sm btn-outline-warning rounded-pill status-btn" title="Estado"><i class="fas fa-sync-alt"></i></button>
+                                <div class="btn-group" role="group" aria-label="Acciones del equipo">
+                                    <button type="button" class="btn btn-sm btn-outline-info rounded-circle me-2 maint-btn" data-id="<?php echo $row['compu_id']; ?>" title="Registrar Mantenimiento">
+                                        <i class="fas fa-wrench"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-light rounded-circle me-2 view-history-btn" 
+                                            data-id="<?php echo $row['compu_id']; ?>" 
+                                            data-type="equipo" 
+                                            data-name="<?php echo htmlspecialchars('PC-'.$row['numero_puesto']); ?>" 
+                                            title="Ver Historial">
+                                        <i class="fas fa-history"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-light rounded-circle me-2 edit-btn" title="Editar">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-warning rounded-circle status-btn" title="Estado">
+                                        <i class="fas fa-sync-alt"></i>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -568,6 +668,72 @@ if ($res_p) {
     </div>
 </div>
 
+<div class="modal fade" id="modalMantenimiento" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal text-white">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-wrench me-2"></i> Registro de Mantenimiento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="maintForm">
+                    <input type="hidden" name="action" value="register_maintenance">
+                    <input type="hidden" name="id" id="maint_entity_id">
+                    <input type="hidden" name="tipo_entidad" value="equipo">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                    
+                    <p class="text-white-50">Componente: <strong id="maint_display_name" class="text-white"></strong></p>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">FECHA DE MANTENIMIENTO</label>
+                        <input type="date" name="fecha_mantenimiento" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">TIPO DE MANTENIMIENTO</label>
+                        <select name="tipo_mantenimiento" id="tipo_mantenimiento" class="form-select" required>
+                            <option value="preventivo">Preventivo</option>
+                            <option value="correctivo">Correctivo</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">RAZÓN / MOTIVO</label>
+                        <textarea name="razon" class="form-control" rows="2" required placeholder="Motivo del ingreso a revisión..."></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label id="label_diagnostico" class="form-label small fw-bold">DIAGNÓSTICO / CORRECCIÓN</label>
+                        <textarea name="diagnostico_correccion" id="diagnostico_correccion" class="form-control" rows="3" placeholder="Detalle las reparaciones aplicadas..."></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-info w-100 fw-bold">GUARDAR REGISTRO</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Historial de Mantenimiento -->
+<div class="modal fade" id="modalHistorialMantenimiento" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content glass-modal text-white">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="fas fa-history me-2"></i> Historial de Mantenimientos: <span id="history_entity_name"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="history_content" class="p-3">
+                    <!-- Contenido cargado dinámicamente -->
+                    <div class="text-center text-white-50 py-5">
+                        <i class="fas fa-spinner fa-spin me-2"></i> Cargando historial...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="statusModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal">
@@ -643,6 +809,23 @@ if ($res_p) {
     execAction('addEquipoForm', 'addEquipoModal');
     execAction('editEquipoForm', 'editEquipoModal');
     execAction('statusForm', 'statusModal');
+    execAction('maintForm', 'modalMantenimiento');
+
+    const typeSelect = document.getElementById('tipo_mantenimiento');
+    const descField = document.getElementById('diagnostico_correccion');
+    const descLabel = document.getElementById('label_diagnostico');
+
+    typeSelect?.addEventListener('change', function() {
+        if (this.value === 'correctivo') {
+            descField.setAttribute('required', 'required');
+            descField.classList.add('border-info');
+            descLabel.innerHTML = 'DIAGNÓSTICO / CORRECCIÓN <span class="text-danger">*</span>';
+        } else {
+            descField.removeAttribute('required');
+            descField.classList.remove('border-info');
+            descLabel.innerText = 'DIAGNÓSTICO / CORRECCIÓN';
+        }
+    });
 
     document.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', () => { 
         const r = b.closest('tr').dataset; 
@@ -690,6 +873,63 @@ if ($res_p) {
     });
 
     document.querySelectorAll('.status-btn').forEach(b => b.addEventListener('click', () => { const r = b.closest('tr').dataset; document.getElementById('status_id').value = r.id; document.getElementById('status_name').innerText = r.nombre; document.getElementById('status_select').value = r.estado; new bootstrap.Modal(document.getElementById('statusModal')).show(); }));
+
+    document.querySelectorAll('.maint-btn').forEach(b => b.addEventListener('click', () => { 
+        const r = b.closest('tr').dataset; 
+        document.getElementById('maint_entity_id').value = b.dataset.id; 
+        document.getElementById('maint_display_name').innerText = r.nombre; 
+        new bootstrap.Modal(document.getElementById('modalMantenimiento')).show(); 
+    }));
+
+    // Lógica para el botón "Ver Historial"
+    document.querySelectorAll('.view-history-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const entityId = this.dataset.id;
+            const entityType = this.dataset.type;
+            const entityName = this.dataset.name;
+            const historyModal = new bootstrap.Modal(document.getElementById('modalHistorialMantenimiento'));
+            const historyContent = document.getElementById('history_content');
+            const historyEntityName = document.getElementById('history_entity_name');
+
+            historyEntityName.innerText = entityName;
+            historyContent.innerHTML = '<div class="text-center text-white-50 py-5"><i class="fas fa-spinner fa-spin me-2"></i> Cargando historial...</div>';
+            historyModal.show();
+
+            try {
+                const response = await fetch(`get_mantenimientos_ajax.php?id=${entityId}&tipo=${entityType}`);
+                const data = await response.json();
+
+                if (data.success && data.mantenimientos.length > 0) {
+                    let html = '<div class="timeline">';
+                    data.mantenimientos.forEach((maint, index) => {
+                        const typeBadge = maint.tipo_mantenimiento === 'preventivo' ? 'bg-success' : 'bg-danger';
+                        const invertedClass = index % 2 === 1 ? 'timeline-inverted' : ''; // Alternar lados
+                        html += `
+                            <div class="timeline-item ${invertedClass}">
+                                <div class="timeline-badge ${typeBadge}"></div>
+                                <div class="timeline-panel glass-card p-3 mb-3">
+                                    <div class="timeline-heading">
+                                        <h6 class="timeline-title text-white">${maint.tipo_mantenimiento.toUpperCase()} - ${maint.fecha_mantenimiento}</h6>
+                                    </div>
+                                    <div class="timeline-body">
+                                        <p class="text-white-50 mb-1"><strong>Razón:</strong> ${maint.razon}</p>
+                                        <p class="text-white-50"><strong>Diagnóstico/Corrección:</strong> ${maint.diagnostico_correccion || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    historyContent.innerHTML = html;
+                } else {
+                    historyContent.innerHTML = '<div class="text-center text-white-50 py-5"><i class="fas fa-info-circle me-2"></i> Este dispositivo no registra mantenimientos previos.</div>';
+                }
+            } catch (error) {
+                console.error('Error fetching maintenance history:', error);
+                historyContent.innerHTML = '<div class="text-center text-danger py-5"><i class="fas fa-exclamation-triangle me-2"></i> Error al cargar el historial.</div>';
+            }
+        });
+    });
 </script>
 
 <?php include_once "includes/footer.php";

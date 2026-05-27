@@ -224,6 +224,23 @@ CREATE TABLE `log_cambios_bienes` (
   CONSTRAINT `log_cambios_bienes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `usuarios` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+DROP TABLE IF EXISTS `mantenimientos`;
+CREATE TABLE IF NOT EXISTS `mantenimientos` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `equipo_id` int DEFAULT NULL,
+  `periferico_id` int DEFAULT NULL,
+  `fecha_mantenimiento` datetime NOT NULL,
+  `tipo_mantenimiento` enum('preventivo','correctivo') NOT NULL,
+  `razon` text NOT NULL,
+  `diagnostico_correccion` text DEFAULT NULL,
+  `fecha_registro` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_equipo_maint` (`equipo_id`),
+  KEY `idx_perif_maint` (`periferico_id`),
+  CONSTRAINT `fk_maint_equipo` FOREIGN KEY (`equipo_id`) REFERENCES `computadoras` (`id`) ON DELETE SET NULL ON UPDATE CASCADE,
+  CONSTRAINT `fk_maint_perif` FOREIGN KEY (`periferico_id`) REFERENCES `perifericos` (`id`) ON DELETE SET NULL ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================================
 -- 3. CARGA DE DATOS
 -- =====================================================================

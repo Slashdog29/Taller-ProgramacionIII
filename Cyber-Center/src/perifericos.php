@@ -1,14 +1,45 @@
 <?php
+ob_start(); // Iniciar el buffer de salida
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 require_once __DIR__ . "/../conexion.php";
 global $conexion;
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_brand') {
-    $brand = trim($_POST['brand_name'] ?? '');
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+
+// Bloque para manejar todas las peticiones AJAX POST
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+    ob_clean(); // Limpiar cualquier salida antes de enviar JSON
     header('Content-Type: application/json');
-    if ($brand === '') {
-        echo json_encode(['success' => false, 'message' => 'Nombre de marca vacío.']);
+
+    if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== ($_SESSION['csrf_token'] ?? '')) {
+        echo json_encode(['success' => false, 'message' => 'Token de seguridad inválido.']);
         exit;
     }
+
+    $action = $_POST['action'] ?? '';
+    $stmt = null; // Inicializar $stmt para uso en el bloque AJAX
+    $id = intval($_POST['id'] ?? 0); // ID para acciones de edición/mantenimiento
+    $usuario_sesion = $_SESSION['nombre'] ?? 'Sistema';
+    $ip_remota = $_SERVER['REMOTE_ADDR'];
+    $fecha_hora = date('Y-m-d H:i:s');
+    $sector = "Periféricos";
+    $msg = ''; // Mensaje de éxito
+    $accion_historial = ''; // Acción para el historial
+
+    // --- ACCIÓN: CREAR MARCA ---
+    if ($action === 'create_brand') {
+        $brand = trim($_POST['brand_name'] ?? '');
+        if ($brand === '') {
+            echo json_encode(['success' => false, 'message' => 'El nombre de la marca no puede estar vacío.']);
+            exit;
+        }
+
     $chk = $conexion->prepare("SELECT COUNT(*) FROM marca WHERE nombremarca = ?");
     if ($chk) {
         $chk->bind_param('s', $brand);
@@ -17,50 +48,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $chk->fetch();
         $chk->close();
         if ($cntm > 0) { 
-            echo json_encode(['success' => false, 'message' => 'La marca ya está registrada.']); 
+            echo json_encode(['success' => false, 'message' => 'La marca ya existe.']); 
             exit; 
         }
     }
     $insm = $conexion->prepare("INSERT INTO marca (nombremarca) VALUES (?)");
     if ($insm) {
         $insm->bind_param('s', $brand);
-        if ($insm->execute()) { 
-            $insm->close();
-            echo json_encode(['success' => true, 'message' => 'Marca registrada con éxito.']); 
-            exit; 
-        } else { 
-            $insm->close();
-            echo json_encode(['success' => false, 'message' => 'Error al insertar marca.']); 
-            exit; 
-        }
+        $stmt = $insm; // Asignar a $stmt para el manejo común de éxito/error
+        $msg = 'Marca registrada con éxito.';
+        $accion_historial = "Registró nueva marca: $brand";
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta de marca: ' . $conexion->error]);
+        exit;
     }
-    echo json_encode(['success' => false, 'message' => 'Error interno del servidor.']); 
-    exit;
-}
+    }
 
-include_once "includes/header.php";
-
-$mensaje = '';
-
-$nombre = $_SESSION['nombre'] ?? 'Usuario';
-$ip = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-$fecha_hora = date('Y-m-d H:i:s');
-$sector_acceso = 'Periféricos';
-$accion_acceso = 'Acceso a la sección de gestión de periféricos';
-
-$hstmt = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
-if ($hstmt) {
-    $hstmt->bind_param('sssss', $nombre, $ip, $fecha_hora, $sector_acceso, $accion_acceso);
-    $hstmt->execute();
-    $hstmt->close();
-}
-
-$res_marcas = mysqli_query($conexion, "SELECT * FROM marca ORDER BY nombremarca ASC");
-$marcas_list = [];
-while($m = mysqli_fetch_assoc($res_marcas)) $marcas_list[] = $m;
-
-//Crear Periférico
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'create_periferico') {
+    // --- ACCIÓN: CREAR PERIFÉRICO ---
+    elseif ($action === 'create_periferico') {
     $tipo_id = intval($_POST['tipo_periferico_id'] ?? 0);
     $computadora_id = (isset($_POST['computadora_id']) && $_POST['computadora_id'] === '') ? null : intval($_POST['computadora_id'] ?? 0);
     $codigo_bien = trim($_POST['codigo_bien_nacional'] ?? '');
@@ -71,7 +76,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $estado = in_array($_POST['estado_fisico'] ?? '', ['excelente','bueno','regular','dañado']) ? $_POST['estado_fisico'] : 'excelente';
 
     if ($tipo_id <= 0 || $codigo_bien === '' || $serial === '' || $marca === '' || $modelo === '') {
-        $mensaje = 'Complete los campos obligatorios: tipo, código, serial, marca y modelo.';
+        echo json_encode(['success' => false, 'message' => 'Complete los campos obligatorios: tipo, código, serial, marca y modelo.']);
+        exit;
     } else {
         //Validar Bien Nacional individualmente
         $chkBien = $conexion->prepare("SELECT id FROM perifericos WHERE codigo_bien_nacional = ? LIMIT 1");
@@ -90,11 +96,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $chkSerial->close();
 
         if ($existeBien) {
-            $mensaje = 'Error: El código de Bien Nacional ya está registrado en el sistema.';
+            echo json_encode(['success' => false, 'message' => 'Error: El código de Bien Nacional ya está registrado en el sistema.']);
+            exit;
         } elseif ($existeSerial) {
-            $mensaje = 'Error: El número serial de fábrica ya está registrado en el sistema.';
+            echo json_encode(['success' => false, 'message' => 'Error: El número serial de fábrica ya está registrado en el sistema.']);
+            exit;
         } else {
-            if ($computadora_id === null || $computadora_id === 0) {
+            if ($computadora_id === null) { // Si es 0, se asume que no está asignado
                 $insertSql = "INSERT INTO perifericos (computadora_id, tipo_periferico_id, codigo_bien_nacional, numero_serial_fabrica, marca, modelo, color, estado_fisico) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?)";
                 $ins = $conexion->prepare($insertSql);
                 if ($ins) { $ins->bind_param('issssss', $tipo_id, $codigo_bien, $serial, $marca, $modelo, $color, $estado); }
@@ -105,22 +113,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
 
             if (isset($ins) && $ins) {
-                if ($ins->execute()) {
-                    $sector_hist = 'Periféricos';
-                    $accion_hist = "Registró periférico: $codigo_bien / $serial";
-                    $h = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
-                    if ($h) { $h->bind_param('sssss', $nombre, $ip, $fecha_hora, $sector_hist, $accion_hist); $h->execute(); $h->close(); }
-                    echo "<script>window.location.href='perifericos.php';</script>";
-                    exit;
-                } else { $mensaje = 'Error al insertar periférico: ' . $conexion->error; }
-                $ins->close();
+                $stmt = $ins;
+                $msg = 'Periférico registrado con éxito.';
+                $accion_historial = "Registró periférico: $codigo_bien / $serial";
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta de periférico: ' . $conexion->error]);
+                exit;
             }
         }
     }
-}
+    }
 
-// Actualizar Periférico
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'update_periferico') {
+    // --- ACCIÓN: ACTUALIZAR PERIFÉRICO ---
+    elseif ($action === 'update_periferico') {
     $id = intval($_POST['id'] ?? 0);
     $tipo_id = intval($_POST['tipo_periferico_id'] ?? 0);
     $computadora_id = (isset($_POST['computadora_id']) && $_POST['computadora_id'] === '') ? null : intval($_POST['computadora_id'] ?? 0);
@@ -132,7 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $estado = in_array($_POST['estado_fisico'] ?? '', ['excelente','bueno','regular','dañado']) ? $_POST['estado_fisico'] : 'excelente';
 
     if ($id <= 0 || $tipo_id <= 0 || $codigo_bien === '' || $serial === '' || $marca === '' || $modelo === '') {
-        $mensaje = 'Complete los campos obligatorios para actualizar.';
+        echo json_encode(['success' => false, 'message' => 'Complete los campos obligatorios para actualizar.']);
+        exit;
     } else {
         $chkBien = $conexion->prepare("SELECT id FROM perifericos WHERE codigo_bien_nacional = ? AND id != ? LIMIT 1");
         $chkBien->bind_param('si', $codigo_bien, $id);
@@ -149,11 +155,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         $chkSerial->close();
 
         if ($existeBien) {
-            $mensaje = 'Error: El código de Bien Nacional ya pertenece a otro periférico registrado.';
+            echo json_encode(['success' => false, 'message' => 'Error: El código de Bien Nacional ya pertenece a otro periférico registrado.']);
+            exit;
         } elseif ($existeSerial) {
-            $mensaje = 'Error: El número serial ya pertenece a otro periférico registrado.';
+            echo json_encode(['success' => false, 'message' => 'Error: El número serial ya pertenece a otro periférico registrado.']);
+            exit;
         } else {
-            if ($computadora_id === null || $computadora_id === 0) {
+            if ($computadora_id === null) {
                 $updateSql = "UPDATE perifericos SET computadora_id = NULL, tipo_periferico_id = ?, codigo_bien_nacional = ?, numero_serial_fabrica = ?, marca = ?, modelo = ?, color = ?, estado_fisico = ? WHERE id = ?";
                 $upd = $conexion->prepare($updateSql);
                 if ($upd) { $upd->bind_param('issssssi', $tipo_id, $codigo_bien, $serial, $marca, $modelo, $color, $estado, $id); }
@@ -164,18 +172,60 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             }
 
             if (isset($upd) && $upd) {
-                if ($upd->execute()) {
-                    $sector_hist = 'Periféricos';
-                    $accion_hist = "Modificó periférico ID $id: $codigo_bien / $serial";
-                    $h = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
-                    if ($h) { $h->bind_param('sssss', $nombre, $ip, $fecha_hora, $sector_hist, $accion_hist); $h->execute(); $h->close(); }
-                    echo "<script>window.location.href='perifericos.php';</script>";
-                    exit;
-                } else { $mensaje = 'Error al actualizar periférico: ' . $conexion->error; }
-                $upd->close();
+                $stmt = $upd;
+                $msg = 'Periférico actualizado con éxito.';
+                $accion_historial = "Modificó periférico ID $id: $codigo_bien / $serial";
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta de actualización: ' . $conexion->error]);
+                exit;
             }
         }
     }
+    }
+
+    // --- ACCIÓN: REGISTRAR MANTENIMIENTO ---
+    elseif ($action === 'register_maintenance') {
+    $id = intval($_POST['id'] ?? 0);
+    $fecha = trim($_POST['fecha_mantenimiento'] ?? date('Y-m-d')); // Espera YYYY-MM-DD
+    $tipo = $_POST['tipo_mantenimiento'] ?? 'preventivo';
+    $razon = trim($_POST['razon'] ?? '');
+    $diagnostico = trim($_POST['diagnostico_correccion'] ?? '');
+
+    if ($id <= 0 || empty($razon)) {
+        echo json_encode(['success' => false, 'message' => 'La razón del mantenimiento es obligatoria.']);
+        exit;
+    }
+    if ($tipo === 'correctivo' && empty($diagnostico)) {
+        echo json_encode(['success' => false, 'message' => 'El diagnóstico/corrección es obligatorio para mantenimientos correctivos.']);
+        exit;
+    }
+
+    // MySQL puede convertir 'YYYY-MM-DD' a DATETIME 'YYYY-MM-DD 00:00:00' automáticamente.
+    // No es necesario añadir la hora si el input es solo de fecha.
+
+    $mstmt = $conexion->prepare("INSERT INTO mantenimientos (equipo_id, periferico_id, fecha_mantenimiento, tipo_mantenimiento, razon, diagnostico_correccion) VALUES (NULL, ?, ?, ?, ?, ?)");
+    if ($mstmt) {
+        $mstmt->bind_param('issss', $id, $fecha, $tipo, $razon, $diagnostico);
+        $stmt = $mstmt; // Asignar a $stmt para el manejo común de éxito/error
+        $msg = "Mantenimiento registrado correctamente.";
+        $accion_historial = "Registró mantenimiento ($tipo) para periférico ID $id";
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Error al preparar la consulta de mantenimiento: ' . $conexion->error]);
+        exit;
+    }
+    }
+
+    // Manejo común de éxito/error para todas las acciones AJAX
+    if (isset($stmt) && $stmt->execute()) {
+        $stmt_h = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES (?, ?, ?, ?, ?)");
+        $stmt_h->bind_param("sssss", $usuario_sesion, $ip_remota, $fecha_hora, $sector, $accion_historial);
+        $stmt_h->execute();
+        echo json_encode(['success' => true, 'message' => $msg]);
+    } else {
+        echo json_encode(['success' => false, 'message' => 'Error en la base de datos: ' . ($stmt ? $stmt->error : $conexion->error)]);
+    }
+    if ($stmt) $stmt->close();
+    exit; // Terminar la ejecución después de la respuesta AJAX
 }
 
 // --- LÓGICA DE PAGINACIÓN ---
@@ -189,10 +239,13 @@ $total_registros = mysqli_fetch_assoc($total_res)['total'];
 $total_paginas = ceil($total_registros / $por_pagina);
 
 // 2. Consulta principal con LIMIT y OFFSET
-$query = "SELECT p.*, tp.nombre_componente, comp.numero_puesto, comp.codigo_bien_nacional, comp.direccion_ip
+$query = "SELECT p.*, tp.nombre_componente, comp.numero_puesto, comp.codigo_bien_nacional, comp.direccion_ip,
+                  COUNT(m.id) AS total_mantenimientos
           FROM perifericos p
           LEFT JOIN tipos_periferico tp ON tp.id = p.tipo_periferico_id
           LEFT JOIN computadoras comp ON comp.id = p.computadora_id
+          LEFT JOIN mantenimientos m ON p.id = m.periferico_id
+          GROUP BY p.id
           ORDER BY p.fecha_registro DESC LIMIT ? OFFSET ?";
 
 $stmt_query = mysqli_prepare($conexion, $query);
@@ -200,15 +253,17 @@ mysqli_stmt_bind_param($stmt_query, "ii", $por_pagina, $offset);
 mysqli_stmt_execute($stmt_query);
 $resultado = mysqli_stmt_get_result($stmt_query);
 
-$tiposRes = mysqli_query($conexion, "SELECT id, nombre_componente FROM tipos_periferico ORDER BY nombre_componente ASC");
-$computadorasRes = mysqli_query($conexion, "SELECT id, numero_puesto, direccion_ip FROM computadoras ORDER BY numero_puesto ASC");
-$marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nombremarca ASC");
+include_once "includes/header.php"; // Incluir el header después de la lógica de procesamiento
+
+$tiposRes = mysqli_query($conexion, "SELECT id, nombre_componente FROM tipos_periferico ORDER BY nombre_componente ASC"); // Se vuelve a consultar para el HTML
+$computadorasRes = mysqli_query($conexion, "SELECT id, numero_puesto, direccion_ip FROM computadoras ORDER BY numero_puesto ASC"); // Se vuelve a consultar para el HTML
+$marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nombremarca ASC"); // Se vuelve a consultar para el HTML
 ?>
 
 <style>
     .table { color: var(--text-light); margin-bottom: 0; border-collapse: separate; border-spacing: 0; }
     .table thead th { background: rgba(0, 0, 0, 0.4); border-bottom: 1px solid var(--glass-border); color: var(--primary-light); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1.2px; padding: 1.25rem 1rem; font-weight: 800; }
-    .table td { vertical-align: middle; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 1.25rem 1rem; background: transparent; }
+    .table td { vertical-align: middle; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 1.25rem 1rem; background: transparent; color: #ffffff !important; }
     .table tbody tr { transition: all 0.3s ease; }
     .table tbody tr:hover { background: rgba(0, 0, 0, 0.3) !important; }
     .status-badge { border-radius: 20px; padding: 0.45rem 0.85rem; font-size: 0.65rem; text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px; }
@@ -253,14 +308,68 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
     .search-wrapper .form-control:focus { border-color: var(--primary-light) !important; box-shadow: 0 0 15px rgba(13, 110, 253, 0.1) !important; }
 </style>
 
+<style>
+    /* Timeline styles for maintenance history */
+    .timeline {
+        position: relative;
+        padding: 20px 0;
+        list-style: none;
+    }
+    .timeline:before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 50%;
+        width: 2px;
+        margin-left: -1px;
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+    .timeline-item {
+        margin-bottom: 20px;
+        position: relative;
+    }
+    .timeline-item:before, .timeline-item:after {
+        content: " ";
+        display: table;
+    }
+    .timeline-item:after {
+        clear: both;
+    }
+    .timeline-badge {
+        color: #fff;
+        width: 24px;
+        height: 24px;
+        line-height: 24px;
+        font-size: 1.4em;
+        text-align: center;
+        position: absolute;
+        top: 16px;
+        left: 50%;
+        margin-left: -12px;
+        background-color: #999999;
+        z-index: 100;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+    }
+    .timeline-panel {
+        width: 45%;
+        float: left;
+        border-radius: 12px;
+        position: relative;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(15, 23, 42, 0.7); /* glass-modal background */
+        backdrop-filter: blur(10px);
+    }
+    .timeline-item.timeline-inverted .timeline-panel {
+        float: right;
+    }
+</style>
 <div class="container main-content pb-5">
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
         <div>
             <h2 class="fw-bold mb-0 text-white">Gestión de Periféricos</h2>
             <p class="text-white-50">Control de hardware y componentes externos</p>
-            <?php if (!empty($mensaje)): ?>
-                <div class="alert alert-danger mt-2 py-2 px-3 fw-bold"><?php echo htmlspecialchars($mensaje); ?></div>
-            <?php endif; ?>
         </div>
         <div class="d-flex flex-wrap gap-2">
             <div class="search-wrapper">
@@ -281,7 +390,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form method="post" id="perifericoForm" class="row g-3">
+                    <form id="perifericoForm" class="row g-3">
                         <input type="hidden" name="action" value="create_periferico">
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">TIPO</label>
@@ -348,7 +457,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <form method="post" id="editPerifericoForm" class="row g-3">
+                    <form id="editPerifericoForm" class="row g-3">
                         <input type="hidden" name="action" value="update_periferico">
                         <input type="hidden" name="id" id="edit_id">
                         
@@ -408,6 +517,66 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
         </div>
     </div>
 
+    <!-- Modal MANTENIMIENTO Reutilizable -->
+    <div class="modal fade" id="modalMantenimiento" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-modal text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-wrench me-2"></i>Registro de Mantenimiento</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="maintForm" class="row g-3">
+                        <input type="hidden" name="action" value="register_maintenance">
+                        <input type="hidden" name="id" id="maint_entity_id">
+                        <input type="hidden" name="tipo_entidad" value="periferico">
+                        <p class="text-white-50">Componente: <strong id="maint_display_name" class="text-white"></strong></p>
+                        <div class="col-md-12">
+                            <label class="form-label text-white-50 small fw-bold">FECHA DE MANTENIMIENTO</label>
+                            <input type="date" name="fecha_mantenimiento" class="form-control" value="<?php echo date('Y-m-d'); ?>" required>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-white-50 small fw-bold">TIPO DE MANTENIMIENTO</label>
+                            <select name="tipo_mantenimiento" id="tipo_mantenimiento" class="form-select" required>
+                                <option value="preventivo">Preventivo</option>
+                                <option value="correctivo">Correctivo</option>
+                            </select>
+                        </div>
+                        <div class="col-md-12">
+                            <label class="form-label text-white-50 small fw-bold">RAZÓN / MOTIVO</label>
+                            <textarea name="razon" class="form-control" rows="2" required placeholder="Motivo del ingreso a revisión..."></textarea>
+                        </div>
+                        <div class="col-md-12">
+                            <label id="label_diagnostico" class="form-label text-white-50 small fw-bold">DIAGNÓSTICO / CORRECCIÓN</label>
+                            <textarea name="diagnostico_correccion" id="diagnostico_correccion" class="form-control" rows="3" placeholder="Detalle las reparaciones aplicadas..."></textarea>
+                        </div>
+                        <div class="col-12 mt-3"><button class="btn btn-info w-100 fw-bold" type="submit">GUARDAR REGISTRO</button></div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Historial de Mantenimiento -->
+    <div class="modal fade" id="modalHistorialMantenimiento" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content glass-modal text-white">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fas fa-history me-2"></i> Historial de Mantenimientos: <span id="history_entity_name"></span></h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="history_content" class="p-3">
+                        <!-- Contenido cargado dinámicamente -->
+                        <div class="text-center text-white-50 py-5">
+                            <i class="fas fa-spinner fa-spin me-2"></i> Cargando historial...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Datalist global para marcas -->
     <datalist id="marcasDataList">
         <?php if ($marcasRes): mysqli_data_seek($marcasRes, 0); while ($m = mysqli_fetch_assoc($marcasRes)): ?>
@@ -453,6 +622,7 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                         <th>SERIAL</th>
                         <th>MARCA</th>
                         <th>MODELO</th>
+                        <th>MANTENIMIENTOS</th>
                         <th>ESTADO</th>
                         <th class="text-end">ACCIONES</th>
                     </tr>
@@ -480,23 +650,48 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
                                 <td><?php echo htmlspecialchars($row['marca'] ?? '-'); ?></td>
                                 <td><?php echo htmlspecialchars($row['modelo'] ?? '-'); ?></td>
                                 <td>
+                                    <?php
+                                        $maint_count = intval($row['total_mantenimientos']);
+                                        $maint_text_class = ($maint_count > 3) ? 'text-warning' : 'text-white-50';
+                                    ?>
+                                    <span class="badge bg-dark border border-secondary <?php echo $maint_text_class; ?>">
+                                        <?php echo $maint_count; ?> veces
+                                    </span>
+                                </td>
+                                <td>
                                     <span class="badge status-badge <?php echo (($row['estado_fisico'] ?? '') === 'dañado' ? 'bg-danger' : (($row['estado_fisico'] ?? '') === 'regular' ? 'bg-warning text-dark' : 'bg-success')); ?>">
                                         <?php echo htmlspecialchars($row['estado_fisico'] ?? 'excelente'); ?>
                                     </span>
                                 </td>
                                 <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-light rounded-pill btn-edit-periferico" 
-                                            data-id="<?php echo $row['id']; ?>"
-                                            data-tipo="<?php echo $row['tipo_periferico_id']; ?>"
-                                            data-computadora="<?php echo $row['computadora_id'] ?? ''; ?>"
-                                            data-codigo="<?php echo htmlspecialchars($row['codigo_bien_nacional'] ?? ''); ?>"
-                                            data-serial="<?php echo htmlspecialchars($row['numero_serial_fabrica'] ?? ''); ?>"
-                                            data-marca="<?php echo htmlspecialchars($row['marca'] ?? ''); ?>"
-                                            data-modelo="<?php echo htmlspecialchars($row['modelo'] ?? ''); ?>"
-                                            data-color="<?php echo htmlspecialchars($row['color'] ?? ''); ?>"
-                                            data-estado="<?php echo htmlspecialchars($row['estado_fisico'] ?? 'excelente'); ?>">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
+                                    <div class="btn-group" role="group" aria-label="Acciones del dispositivo">
+                                        <button type="button" class="btn btn-sm btn-outline-info rounded-circle me-2 maint-btn" 
+                                                data-id="<?php echo $row['id']; ?>"
+                                                data-nombre="<?php echo htmlspecialchars(($row['nombre_componente'] ?? 'Periférico') . ' - ' . $row['marca'] . ' ' . $row['modelo']); ?>"
+                                                title="Registrar Mantenimiento">
+                                            <i class="fas fa-wrench"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle me-2 view-history-btn"
+                                                data-id="<?php echo $row['id']; ?>"
+                                                data-type="periferico"
+                                                data-name="<?php echo htmlspecialchars(($row['nombre_componente'] ?? 'Periférico') . ' - ' . $row['marca'] . ' ' . $row['modelo']); ?>"
+                                                title="Ver Historial">
+                                            <i class="fas fa-history"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-outline-light rounded-circle btn-edit-periferico" 
+                                                data-id="<?php echo $row['id']; ?>"
+                                                data-tipo="<?php echo $row['tipo_periferico_id']; ?>"
+                                                data-computadora="<?php echo $row['computadora_id'] ?? ''; ?>"
+                                                data-codigo="<?php echo htmlspecialchars($row['codigo_bien_nacional'] ?? ''); ?>"
+                                                data-serial="<?php echo htmlspecialchars($row['numero_serial_fabrica'] ?? ''); ?>"
+                                                data-marca="<?php echo htmlspecialchars($row['marca'] ?? ''); ?>"
+                                                data-modelo="<?php echo htmlspecialchars($row['modelo'] ?? ''); ?>"
+                                                data-color="<?php echo htmlspecialchars($row['color'] ?? ''); ?>"
+                                                data-estado="<?php echo htmlspecialchars($row['estado_fisico'] ?? 'excelente'); ?>"
+                                                title="Editar">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endwhile; ?>
@@ -554,6 +749,81 @@ document.addEventListener('DOMContentLoaded', function(){
 
             const editModal = new bootstrap.Modal(document.getElementById('editPerifericoModal'));
             editModal.show();
+        });
+    });
+
+    const maintButtons = document.querySelectorAll('.maint-btn');
+    maintButtons.forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.getElementById('maint_entity_id').value = this.getAttribute('data-id');
+            document.getElementById('maint_display_name').innerText = this.getAttribute('data-nombre');
+            new bootstrap.Modal(document.getElementById('modalMantenimiento')).show();
+        });
+    });
+
+    const typeSelect = document.getElementById('tipo_mantenimiento');
+    const descField = document.getElementById('diagnostico_correccion');
+    const descLabel = document.getElementById('label_diagnostico');
+
+    typeSelect?.addEventListener('change', function() {
+        if (this.value === 'correctivo') {
+            descField.setAttribute('required', 'required');
+            descField.classList.add('border-info');
+            descLabel.innerHTML = 'DIAGNÓSTICO / CORRECCIÓN <span class="text-danger">*</span>';
+        } else {
+            descField.removeAttribute('required');
+            descField.classList.remove('border-info');
+            descLabel.innerText = 'DIAGNÓSTICO / CORRECCIÓN';
+        }
+    });
+
+    // Lógica para el botón "Ver Historial"
+    document.querySelectorAll('.view-history-btn').forEach(button => {
+        button.addEventListener('click', async function() {
+            const entityId = this.dataset.id;
+            const entityType = this.dataset.type;
+            const entityName = this.dataset.name;
+            const historyModal = new bootstrap.Modal(document.getElementById('modalHistorialMantenimiento'));
+            const historyContent = document.getElementById('history_content');
+            const historyEntityName = document.getElementById('history_entity_name');
+
+            historyEntityName.innerText = entityName;
+            historyContent.innerHTML = '<div class="text-center text-white-50 py-5"><i class="fas fa-spinner fa-spin me-2"></i> Cargando historial...</div>';
+            historyModal.show();
+
+            try {
+                const response = await fetch(`get_mantenimientos_ajax.php?id=${entityId}&tipo=${entityType}`);
+                const data = await response.json();
+
+                if (data.success && data.mantenimientos.length > 0) {
+                    let html = '<div class="timeline">';
+                    data.mantenimientos.forEach((maint, index) => {
+                        const typeBadge = maint.tipo_mantenimiento === 'preventivo' ? 'bg-success' : 'bg-danger';
+                        const invertedClass = index % 2 === 1 ? 'timeline-inverted' : ''; // Alternar lados
+                        html += `
+                            <div class="timeline-item ${invertedClass}">
+                                <div class="timeline-badge ${typeBadge}"></div>
+                                <div class="timeline-panel glass-card p-3 mb-3">
+                                    <div class="timeline-heading">
+                                        <h6 class="timeline-title text-white">${maint.tipo_mantenimiento.toUpperCase()} - ${maint.fecha_mantenimiento}</h6>
+                                    </div>
+                                    <div class="timeline-body">
+                                        <p class="text-white-50 mb-1"><strong>Razón:</strong> ${maint.razon}</p>
+                                        <p class="text-white-50"><strong>Diagnóstico/Corrección:</strong> ${maint.diagnostico_correccion || 'N/A'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    historyContent.innerHTML = html;
+                } else {
+                    historyContent.innerHTML = '<div class="text-center text-white-50 py-5"><i class="fas fa-info-circle me-2"></i> Este dispositivo no registra mantenimientos previos.</div>';
+                }
+            } catch (error) {
+                console.error('Error fetching maintenance history:', error);
+                historyContent.innerHTML = '<div class="text-center text-danger py-5"><i class="fas fa-exclamation-triangle me-2"></i> Error al cargar el historial.</div>';
+            }
         });
     });
 
@@ -624,3 +894,4 @@ document.addEventListener('DOMContentLoaded', function(){
 </script>
 
 <?php include_once "includes/footer.php"; ?>
+<?php ob_end_flush(); // Finalizar el buffer de salida y enviarlo al navegador ?>
