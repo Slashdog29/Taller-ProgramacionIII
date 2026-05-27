@@ -427,12 +427,26 @@ if ($stmt) {
     $stmt->close();
 }
 
-// Consulta para obtener los clientes con su tipo de rol
+// --- LÓGICA DE PAGINACIÓN ---
+$por_pagina = 10; // Registros por página
+$pagina_actual = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
+$offset = ($pagina_actual - 1) * $por_pagina;
+
+// 1. Conteo total de registros (mismo filtro que la consulta principal)
+$total_res = mysqli_query($conexion, "SELECT COUNT(*) as total FROM clientes");
+$total_registros = mysqli_fetch_assoc($total_res)['total'];
+$total_paginas = ceil($total_registros / $por_pagina);
+
+// 2. Consulta principal con LIMIT y OFFSET usando sentencias preparadas
 $query = "SELECT c.*, COALESCE(t.nombre_rol, 'Sin tipo') AS nombre_rol, COALESCE(t.tarifa_por_hora, 0) AS tarifa_por_hora 
           FROM clientes c 
           LEFT JOIN tipos_cliente t ON c.tipo_cliente_id = t.id 
-          ORDER BY c.id ASC";
-$resultado = mysqli_query($conexion, $query);
+          ORDER BY c.id ASC LIMIT ? OFFSET ?";
+
+$stmt_query = mysqli_prepare($conexion, $query);
+mysqli_stmt_bind_param($stmt_query, "ii", $por_pagina, $offset);
+mysqli_stmt_execute($stmt_query);
+$resultado = mysqli_stmt_get_result($stmt_query);
 
 $typeQuery = "SELECT id, nombre_rol FROM tipos_cliente ORDER BY nombre_rol ASC";
 $typeResult = mysqli_query($conexion, $typeQuery);
@@ -587,6 +601,24 @@ if ($tiposTarifasResult) {
         color: white;
         transform: scale(1.02);
     }
+
+    /* Estilos de Paginación Glass-Dark */
+    .pagination .page-link {
+        background: rgba(15, 23, 42, 0.7) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: var(--primary-light) !important;
+        transition: all 0.3s ease;
+    }
+    .pagination .page-item.active .page-link {
+        background: #0d6efd !important;
+        border-color: #0d6efd !important;
+        color: white !important;
+    }
+    .pagination .page-item.disabled .page-link {
+        background: rgba(0, 0, 0, 0.3) !important;
+        color: rgba(255, 255, 255, 0.2) !important;
+        border-color: rgba(255, 255, 255, 0.05) !important;
+    }
 </style>
 
 <div class="container main-content pb-5">
@@ -678,6 +710,23 @@ if ($tiposTarifasResult) {
             </table>
         </div>
     </div>
+
+    <!-- Componente de Paginación Bootstrap 5 -->
+    <nav class="d-flex justify-content-center mt-3">
+        <ul class="pagination pagination-sm">
+            <li class="page-item <?= ($pagina_actual <= 1) ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= ($pagina_actual > 1) ? '?' . http_build_query(array_merge($_GET, ['pagina' => $pagina_actual - 1])) : '#' ?>">Anterior</a>
+            </li>
+            <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                <li class="page-item <?= ($i == $pagina_actual) ? 'active' : '' ?>">
+                    <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['pagina' => $i])) ?>"><?= $i ?></a>
+                </li>
+            <?php endfor; ?>
+            <li class="page-item <?= ($pagina_actual >= $total_paginas) ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= ($pagina_actual < $total_paginas) ? '?' . http_build_query(array_merge($_GET, ['pagina' => $pagina_actual + 1])) : '#' ?>">Siguiente</a>
+            </li>
+        </ul>
+    </nav>
 </div>
 
 <!-- Modal Nuevo Cliente -->

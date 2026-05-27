@@ -178,13 +178,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     }
 }
 
-// Consultas de datos
+// --- LÓGICA DE PAGINACIÓN ---
+$por_pagina = 10;
+$pagina_actual = isset($_GET['pagina']) ? max(1, intval($_GET['pagina'])) : 1;
+$offset = ($pagina_actual - 1) * $por_pagina;
+
+// 1. Conteo total de registros
+$total_res = mysqli_query($conexion, "SELECT COUNT(*) as total FROM perifericos");
+$total_registros = mysqli_fetch_assoc($total_res)['total'];
+$total_paginas = ceil($total_registros / $por_pagina);
+
+// 2. Consulta principal con LIMIT y OFFSET
 $query = "SELECT p.*, tp.nombre_componente, comp.numero_puesto, comp.codigo_bien_nacional, comp.direccion_ip
           FROM perifericos p
           LEFT JOIN tipos_periferico tp ON tp.id = p.tipo_periferico_id
           LEFT JOIN computadoras comp ON comp.id = p.computadora_id
-          ORDER BY p.fecha_registro DESC";
-$resultado = mysqli_query($conexion, $query);
+          ORDER BY p.fecha_registro DESC LIMIT ? OFFSET ?";
+
+$stmt_query = mysqli_prepare($conexion, $query);
+mysqli_stmt_bind_param($stmt_query, "ii", $por_pagina, $offset);
+mysqli_stmt_execute($stmt_query);
+$resultado = mysqli_stmt_get_result($stmt_query);
 
 $tiposRes = mysqli_query($conexion, "SELECT id, nombre_componente FROM tipos_periferico ORDER BY nombre_componente ASC");
 $computadorasRes = mysqli_query($conexion, "SELECT id, numero_puesto, direccion_ip FROM computadoras ORDER BY numero_puesto ASC");
@@ -213,6 +227,23 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e") !important;
     }
     .glass-modal option { background-color: #1a202c; }
+
+    /* Paginación Coherente */
+    .pagination .page-link {
+        background: rgba(15, 23, 42, 0.7) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: var(--primary-light) !important;
+        transition: all 0.3s ease;
+    }
+    .pagination .page-item.active .page-link {
+        background: #0d6efd !important;
+        border-color: #0d6efd !important;
+        color: white !important;
+    }
+    .pagination .page-item.disabled .page-link {
+        background: rgba(0, 0, 0, 0.3) !important;
+        color: rgba(255, 255, 255, 0.2) !important;
+    }
 </style>
 
 <div class="container main-content pb-5">
@@ -463,6 +494,23 @@ $marcasRes = mysqli_query($conexion, "SELECT nombremarca FROM marca ORDER BY nom
             </table>
         </div>
     </div>
+
+    <!-- Paginación -->
+    <nav class="d-flex justify-content-center mt-3">
+        <ul class="pagination pagination-sm">
+            <li class="page-item <?= ($pagina_actual <= 1) ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= ($pagina_actual > 1) ? '?' . http_build_query(array_merge($_GET, ['pagina' => $pagina_actual - 1])) : '#' ?>">Anterior</a>
+            </li>
+            <?php for ($i = 1; $i <= $total_paginas; $i++): ?>
+                <li class="page-item <?= ($i == $pagina_actual) ? 'active' : '' ?>">
+                    <a class="page-link" href="?<?= http_build_query(array_merge($_GET, ['pagina' => $i])) ?>"><?= $i ?></a>
+                </li>
+            <?php endfor; ?>
+            <li class="page-item <?= ($pagina_actual >= $total_paginas) ? 'disabled' : '' ?>">
+                <a class="page-link" href="<?= ($pagina_actual < $total_paginas) ? '?' . http_build_query(array_merge($_GET, ['pagina' => $pagina_actual + 1])) : '#' ?>">Siguiente</a>
+            </li>
+        </ul>
+    </nav>
 </div>
 
 <script>

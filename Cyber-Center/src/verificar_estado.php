@@ -2,9 +2,6 @@
 // verificar_estado.php
 // Endpoint JSON que las terminales del Cyber consultan periódicamente.
 // Responde {"accion":"permitir"} o {"accion":"bloquear","motivo":"..."}
-
-<?php
-// verificar_estado.php - con control de tiempo automático
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . "/../conexion.php";
 
@@ -53,9 +50,21 @@ if (!$has_session) {
 $ahora = new DateTime();
 $fin = new DateTime($hora_fin_estimada);
 if ($ahora > $fin) {
-    // Tiempo expirado: se puede cerrar la sesión automáticamente en la BD (opcional)
-    // mysqli_query($conexion, "UPDATE sesiones SET estado_transaccion = 'finalizado', hora_fin = NOW() WHERE id = $ses_id");
-    // mysqli_query($conexion, "UPDATE computadoras SET estado_operativo = 'disponible' WHERE id = $comp_id");
+    // 1. Finalizar la sesión en la base de datos
+    mysqli_query($conexion, "UPDATE sesiones SET estado_transaccion = 'finalizado', hora_fin = NOW() WHERE id = $ses_id");
+    
+    // 2. Liberar la computadora
+    mysqli_query($conexion, "UPDATE computadoras SET estado_operativo = 'disponible' WHERE id = $comp_id");
+    
+    // 3. Registrar en historial el cierre automático
+    $accion_hist = "Sesión ID $ses_id finalizada automáticamente por tiempo agotado (PC-$numero_puesto)";
+    $hist_stmt = $conexion->prepare("INSERT INTO historial (usuario, ip, fyh, sector, acciones) VALUES ('Sistema', ?, NOW(), 'Sesiones', ?)");
+    if ($hist_stmt) {
+        $hist_stmt->bind_param("ss", $remote_ip, $accion_hist);
+        $hist_stmt->execute();
+        $hist_stmt->close();
+    }
+
     echo json_encode(['accion' => 'bloquear', 'motivo' => 'Tiempo de sesión agotado.']);
     exit;
 }
