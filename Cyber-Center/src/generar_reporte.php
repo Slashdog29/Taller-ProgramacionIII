@@ -15,25 +15,18 @@ class PDF_UNERG extends TCPDF {
         $this->SetMargins(40, 30, 30);
 
         // Logos institucionales (UNERG y AIS)
-        $this->Image(__DIR__ . '/../assets/img/logo_unerg.png', 10, 10, 22);
-        $this->Image(__DIR__ . '/../assets/img/logo_ais.png', 175, 10, 22);
+        $this->Image(__DIR__ . '/../assets/img/logo_unerg.png', 12, 12, 22);
+        $this->Image(__DIR__ . '/../assets/img/logo_ais.png', 176, 12, 22);
 
         // Encabezado Institucional Académico
         $this->SetY(10);
         $this->SetFont('helvetica', 'B', 8);
         $this->Cell(0, 4, 'REPÚBLICA BOLIVARIANA DE VENEZUELA', 0, 1, 'C');
-        $this->Cell(0, 4, 'UNIVERSIDAD NACIONAL EXPERIMENTAL "RÓMULO GALLEGOS"', 0, 1, 'C');
+        $this->Cell(0, 4, 'UNIVERSIDAD NACIONAL EXPERIMENTAL DE LOS LLANOS CENTRALES "RÓMULO GALLEGOS"', 0, 1, 'C');
         $this->Cell(0, 4, 'ÁREA DE INGENIERÍA EN SISTEMAS', 0, 1, 'C');
         $this->Cell(0, 4, 'PROGRAMA DE INGENIERÍA EN INFORMÁTICA - NÚCLEO CALABOZO', 0, 1, 'C');
 
         $this->Ln(10);
-
-        // Bloque de Auditoría Dinámica
-        $this->SetFont('helvetica', 'I', 7);
-        $this->Cell(0, 4, 'Sistema: Cyber-Center | Operador: ' . ($_SESSION['nombre'] ?? 'Sistema Central'), 0, 1, 'R');
-        $this->Cell(0, 4, 'Fecha de Emisión: ' . date('d/m/Y H:i:s'), 0, 1, 'R');
-        $this->Line(40, $this->GetY(), 180, $this->GetY()); 
-        $this->Ln(5);
     }
 
     public function Footer() {
@@ -94,7 +87,7 @@ if ($tipo_reporte === 'individual' && $id > 0) {
             $stmt_p->execute();
             $res_p = $stmt_p->get_result();
             
-            $p_html = '<table border="1" cellpadding="3"><thead><tr bgcolor="#e6e6e6"><th>Componente</th><th>Marca/Modelo</th><th>Serial</th></tr></thead><tbody>';
+            $p_html = '<table border="1" cellpadding="5" style="width:100%;"><thead><tr bgcolor="#e6e6e6" style="font-weight:bold; text-align:center;"><th width="30%">Componente</th><th width="40%">Marca/Modelo</th><th width="30%">Serial</th></tr></thead><tbody>';
             while ($p = $res_p->fetch_assoc()) {
                 $p_html .= '<tr><td>' . $p['nombre_componente'] . '</td><td>' . $p['marca'] . ' ' . $p['modelo'] . '</td><td>' . $p['numero_serial_fabrica'] . '</td></tr>';
             }
@@ -133,8 +126,8 @@ if ($tipo_reporte === 'individual' && $id > 0) {
               GROUP BY m.nombremarca, mdl.nombre_modelo, c.estado_operativo";
     $res = $conexion->query($query);
 
-    $tbl = '<table border="1" cellpadding="4">
-                <thead><tr bgcolor="#d9d9d9"><th>Marca</th><th>Modelo</th><th>Cantidad</th><th>Estado</th></tr></thead>';
+    $tbl = '<table border="1" cellpadding="5" style="width:100%;">
+                <thead><tr bgcolor="#d9d9d9" style="font-weight:bold; text-align:center;"><th width="25%">Marca</th><th width="40%">Modelo</th><th width="15%">Cantidad</th><th width="20%">Estado</th></tr></thead>';
     while($row = $res->fetch_assoc()){
         $tbl .= '<tr><td>'.$row['nombremarca'].'</td><td>'.$row['nombre_modelo'].'</td><td align="center">'.$row['total_equipos'].'</td><td>'.$row['estado_operativo'].'</td></tr>';
     }
@@ -142,34 +135,78 @@ if ($tipo_reporte === 'individual' && $id > 0) {
     $pdf->writeHTML($tbl, true, false, true, false, '');
 
 } elseif ($tipo_reporte === 'mantenimiento') {
-    $pdf->SetFont('helvetica', 'B', 12);
+    // --- 1. BLOQUE DE TÍTULO Y AUDITORÍA (REESTRUCTURADO) ---
+    $pdf->SetY(45); 
+    $pdf->SetFont('helvetica', 'B', 14);
     $pdf->Cell(0, 10, 'HISTORIAL GENERAL DE MANTENIMIENTOS', 0, 1, 'C');
-    $pdf->Ln(5);
+    
+    $pdf->Ln(1); 
+    
+    $pdf->SetFont('helvetica', 'I', 8);
+    $audit_info = 'Sistema: Cyber-Center | Operador: ' . ($_SESSION['nombre'] ?? 'Administrador') . ' | Emisión: ' . date('d/m/Y h:i A');
+    $pdf->Cell(0, 6, $audit_info, 0, 1, 'R');
 
-    // Filtrado por marca/modelo si se especifica
-    $marca_filtro = $_GET['marca'] ?? '';
+    // --- 2. LÍNEA DIVISORIA UNIFICADA ---
+    // Coordenadas: X1=40 (Margen Izq), X2=180 (Ancho A4 - Margen Der 30)
+    $pdf->Line(40, $pdf->GetY(), 180, $pdf->GetY());
+    $pdf->Ln(8);
+
     $sql = "SELECT m.* FROM mantenimientos m ORDER BY m.fecha_mantenimiento DESC";
     $res = $conexion->query($sql);
 
-    $maint_tbl = '<table border="1" cellpadding="3" style="font-size: 8pt;">
-                    <thead><tr bgcolor="#cccccc">
-                        <th width="15%">Fecha</th>
-                        <th width="10%">Entidad</th>
-                        <th width="15%">Tipo</th>
-                        <th width="30%">Descripción Falla</th>
-                        <th width="15%">Técnico</th>
-                    </tr></thead>';
-    while($row = $res->fetch_assoc()){
-        $maint_tbl .= '<tr>
-                        <td>'.date('d/m/Y', strtotime($row['fecha_mantenimiento'])).'</td>
-                        <td>'.$row['tipo_entidad'].' ID:'.$row['entidad_id'].'</td>
-                        <td>'.$row['tipo_mantenimiento'].'</td>
-                        <td>'.$row['descripcion_falla'].'</td>
-                        <td>'.$row['tecnico_responsable'].'</td>
-                      </tr>';
+    // --- 3. MAQUETACIÓN DE TABLA (PADDING Y SIMETRÍA VERTICAL) ---
+    // Configuración de anchos para un total de 140mm (ancho disponible entre márgenes)
+    $w_fecha   = 25;
+    $w_entidad = 25;
+    $w_tipo    = 25;
+    $w_falla   = 40;
+    $w_tec     = 25;
+    $h_min     = 10; // Altura mínima de celda (Padding vertical)
+
+    $pdf->SetFont('helvetica', 'B', 9);
+    $pdf->SetFillColor(230, 230, 230);
+    
+    // Encabezados centrados horizontalmente
+    $pdf->Cell($w_fecha, $h_min, 'Fecha', 1, 0, 'C', 1);
+    $pdf->Cell($w_entidad, $h_min, 'Entidad', 1, 0, 'C', 1);
+    $pdf->Cell($w_tipo, $h_min, 'Tipo', 1, 0, 'C', 1);
+    $pdf->Cell($w_falla, $h_min, 'Descripción Falla', 1, 0, 'C', 1);
+    $pdf->Cell($w_tec, $h_min, 'Técnico', 1, 1, 'C', 1);
+
+    $pdf->SetFont('helvetica', '', 8);
+    $pdf->setCellHeightRatio(1.3); // Ajuste de interlineado académico
+
+    while ($row = $res->fetch_assoc()) {
+        // Cálculo dinámico de altura para MultiCell
+        $height = $pdf->getStringHeight($w_falla, $row['descripcion_falla']);
+        $h_fila = max($height, $h_min);
+
+        // Salto de página preventivo
+        if ($pdf->GetY() + $h_fila > ($pdf->getPageHeight() - 30)) {
+            $pdf->AddPage();
+            $pdf->SetFont('helvetica', 'B', 9);
+            $pdf->Cell($w_fecha, $h_min, 'Fecha', 1, 0, 'C', 1);
+            $pdf->Cell($w_entidad, $h_min, 'Entidad', 1, 0, 'C', 1);
+            $pdf->Cell($w_tipo, $h_min, 'Tipo', 1, 0, 'C', 1);
+            $pdf->Cell($w_falla, $h_min, 'Descripción Falla', 1, 0, 'C', 1);
+            $pdf->Cell($w_tec, $h_min, 'Técnico', 1, 1, 'C', 1);
+            $pdf->SetFont('helvetica', '', 8);
+        }
+
+        // Dibujo de fila sincronizada
+        $current_x = $pdf->GetX();
+        $current_y = $pdf->GetY();
+
+        // Celdas de datos cortos (Centradas)
+        $pdf->MultiCell($w_fecha, $h_fila, date('d/m/Y', strtotime($row['fecha_mantenimiento'])), 1, 'C', 0, 0);
+        $pdf->MultiCell($w_entidad, $h_fila, $row['tipo_entidad'] . "\nID: " . $row['entidad_id'], 1, 'C', 0, 0);
+        $pdf->MultiCell($w_tipo, $h_fila, $row['tipo_mantenimiento'], 1, 'C', 0, 0);
+        
+        // Celda descriptiva (Justificada/Izquierda)
+        $pdf->MultiCell($w_falla, $h_fila, $row['descripcion_falla'], 1, 'J', 0, 0);
+        
+        $pdf->MultiCell($w_tec, $h_fila, $row['tecnico_responsable'], 1, 'C', 0, 1);
     }
-    $maint_tbl .= '</table>';
-    $pdf->writeHTML($maint_tbl, true, false, true, false, '');
 
 } else {
     // Reporte General Básico de Control Rápido
@@ -178,25 +215,30 @@ if ($tipo_reporte === 'individual' && $id > 0) {
     $pdf->Ln(5);
     
     $pdf->SetFont('helvetica', 'B', 9);
-    // Encabezados de tabla
-    $pdf->SetFillColor(230, 230, 230);
-    $pdf->Cell(15, 7, 'ID', 1, 0, 'C', 1); 
-    $pdf->Cell(40, 7, 'MARCA', 1, 0, 'C', 1); 
-    $pdf->Cell(45, 7, 'MODELO', 1, 0, 'C', 1); 
-    $pdf->Cell(40, 7, 'ESTADO', 1, 1, 'C', 1); 
+
+    $tbl_gen = '<table border="1" cellpadding="5" style="width:100%;">
+                <thead><tr bgcolor="#d9d9d9" style="font-weight:bold; text-align:center;">
+                    <th width="10%">ID</th>
+                    <th width="30%">MARCA</th>
+                    <th width="35%">MODELO</th>
+                    <th width="25%">ESTADO</th>
+                </tr></thead><tbody>';
     
-    $pdf->SetFont('helvetica', '', 9);
     $sql = "SELECT c.id, m.nombremarca, mdl.nombre_modelo, c.estado_operativo 
             FROM computadoras c 
             JOIN marca m ON c.marca = m.id_marca
             JOIN modelos mdl ON c.modelo_id = mdl.id";
     $res = $conexion->query($sql);
     while($row = $res->fetch_assoc()) {
-        $pdf->Cell(15, 6, $row['id'], 1, 0, 'C'); 
-        $pdf->Cell(40, 6, $row['nombremarca'], 1); 
-        $pdf->Cell(45, 6, $row['nombre_modelo'], 1); 
-        $pdf->Cell(40, 6, $row['estado_operativo'], 1, 1, 'C');
+        $tbl_gen .= '<tr>
+                        <td align="center">'.$row['id'].'</td>
+                        <td>'.$row['nombremarca'].'</td>
+                        <td>'.$row['nombre_modelo'].'</td>
+                        <td align="center">'.$row['estado_operativo'].'</td>
+                      </tr>';
     }
+    $tbl_gen .= '</tbody></table>';
+    $pdf->writeHTML($tbl_gen, true, false, true, false, '');
 }
 
 // Limpiar buffer de salida para evitar corrupción del PDF
