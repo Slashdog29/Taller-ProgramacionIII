@@ -57,8 +57,8 @@
                         <li class="mb-3">
                             <a href="https://github.com/thejoker-afk" target="_blank" class="text-white text-decoration-none"><img src="https://github.com/thejoker-afk.png" class="avatar-colaborador me-2"> TheJoker-afk</a>
                         </li>
-                        <li>
-                            <span class="text-white"><img src="https://ui-avatars.com/api/?name=Jorge&background=0d6efd&color=fff" class="avatar-colaborador me-2"> Jorge</span>
+                        <li class="mb-3">
+                            <a href="https://github.com/ZedZero12" target="_blank" class="text-white text-decoration-none"><img src="https://github.com/ZedZero12.png" class="avatar-colaborador me-2"> ZedZero12</a>
                         </li>
                     </ul>
                 </div>
