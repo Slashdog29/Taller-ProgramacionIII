@@ -1,5 +1,9 @@
 # Taller-ProgramacionIII
 
+Acerca del proyecto
+
+Repositorio de pruebas y experimentación colaborativa para el desarrollo de ideas y conceptos en programación. Sirve como espacio de aprendizaje colectivo donde se exploran distintas aproximaciones técnicas, se gestionan versiones y se documenta el progreso del equipo en el marco de un taller de programación.
+
 > Un repositorio de puros pendejos,
 > Chango salao,
 > Puto Roberto,
