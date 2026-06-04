@@ -89,7 +89,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
             echo json_encode(['success' => false, 'message' => 'El nombre del modelo es obligatorio.']);
             exit;
         }
-        $chk = $conexion->prepare("SELECT id_modelo FROM modelos WHERE nombre_modelo = ?");
+        $chk = $conexion->prepare("SELECT id FROM modelos WHERE nombre_modelo = ?");
         $chk->bind_param("s", $nombre_modelo);
         $chk->execute(); $chk->store_result();
         if ($chk->num_rows > 0) { echo json_encode(['success' => false, 'message' => 'Este modelo ya existe.']); exit; }
@@ -126,6 +126,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_SERVER['HTTP_X_REQUESTED_WI
     }
     if ($stmt) $stmt->close();
     exit;
+}
+
+// --- LÓGICA DE ALERTAS DE PERIFÉRICOS FALTANTES (Movida para estar disponible en el header) ---
+$equipos_incompletos = [];
+$query_alertas = "
+    SELECT c.id as compu_id, c.numero_puesto, tp.nombre_componente
+    FROM computadoras c
+    CROSS JOIN (
+        SELECT id, nombre_componente 
+        FROM tipos_periferico 
+        WHERE nombre_componente IN ('Monitor', 'Teclado', 'Mouse')
+    ) tp
+    LEFT JOIN perifericos p ON p.computadora_id = c.id AND p.tipo_periferico_id = tp.id
+    WHERE p.id IS NULL AND c.estado_operativo != 'desincorporado'
+    ORDER BY c.numero_puesto ASC, tp.nombre_componente ASC";
+
+$res_alertas = mysqli_query($conexion, $query_alertas);
+if ($res_alertas) {
+    while ($row_a = mysqli_fetch_assoc($res_alertas)) {
+        $equipos_incompletos[] = $row_a;
+    }
 }
 
 include_once "includes/header.php";
@@ -176,34 +197,6 @@ $stmt_query = mysqli_prepare($conexion, $query);
 mysqli_stmt_bind_param($stmt_query, "ii", $por_pagina, $offset);
 mysqli_stmt_execute($stmt_query);
 $resultado = mysqli_stmt_get_result($stmt_query);
-
-// --- LÓGICA DE ALERTAS DE PERIFÉRICOS FALTANTES ---
-// Definimos los nombres exactos de las categorías esenciales
-$esenciales = ["Monitor", "Teclado", "Mouse"];
-$equipos_incompletos = [];
-
-/**
- * Esta consulta genera una matriz de todas las PCs activas contra los 3 tipos esenciales.
- * Si no existe un registro coincidente en la tabla 'perifericos', significa que falta ese componente.
- */
-$query_alertas = "
-    SELECT c.id as compu_id, c.numero_puesto, tp.nombre_componente
-    FROM computadoras c
-    CROSS JOIN (
-        SELECT id, nombre_componente 
-        FROM tipos_periferico 
-        WHERE nombre_componente IN ('Monitor', 'Teclado', 'Mouse')
-    ) tp
-    LEFT JOIN perifericos p ON p.computadora_id = c.id AND p.tipo_periferico_id = tp.id
-    WHERE p.id IS NULL AND c.estado_operativo != 'desincorporado'
-    ORDER BY c.numero_puesto ASC, tp.nombre_componente ASC";
-
-$res_alertas = mysqli_query($conexion, $query_alertas);
-if ($res_alertas) {
-    while ($row_a = mysqli_fetch_assoc($res_alertas)) {
-        $equipos_incompletos[] = $row_a;
-    }
-}
 
 $res_marcas = mysqli_query($conexion, "SELECT * FROM marca ORDER BY nombremarca ASC");
 $marcas_list = [];
@@ -365,6 +358,36 @@ if ($res_p) {
                     <i class="fas fa-search"></i>
                     <input type="text" id="tableSearch" class="form-control" placeholder="Buscar equipo...">
                 </div>
+
+                <!-- Sistema de Notificaciones de Hardware -->
+                <div class="dropdown">
+                    <button class="btn btn-outline-warning position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Alertas de Periféricos">
+                        <i class="fas fa-bell"></i>
+                        <?php if (count($equipos_incompletos) > 0): ?>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6rem;">
+                                <?= count($equipos_incompletos) ?>
+                            </span>
+                        <?php endif; ?>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end glass-modal p-2 shadow-lg" style="min-width: 320px; border: 1px solid rgba(255,193,7,0.3) !important;">
+                        <h6 class="dropdown-header text-warning fw-bold border-bottom border-secondary mb-2 pb-2">ALERTAS DETECTADAS</h6>
+                        <?php if (empty($equipos_incompletos)): ?>
+                            <li><span class="dropdown-item-text text-white-50 small">No hay faltantes críticos detectados.</span></li>
+                        <?php else: ?>
+                            <div style="max-height: 250px; overflow-y: auto; scrollbar-width: thin;">
+                                <?php foreach ($equipos_incompletos as $alerta): ?>
+                                    <li class="mb-1">
+                                        <div class="dropdown-item-text text-white small bg-dark bg-opacity-50 rounded p-2">
+                                            <i class="fas fa-exclamation-circle text-warning me-2"></i>
+                                            <strong>PC-<?= str_pad($alerta['numero_puesto'], 2, '0', STR_PAD_LEFT) ?></strong>: falta <?= htmlspecialchars($alerta['nombre_componente']) ?>.
+                                        </div>
+                                    </li>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+                    </ul>
+                </div>
+
                 <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#addModeloModal">
                     <i class="fas fa-microchip me-2"></i>Registrar Modelo
                 </button>
@@ -376,30 +399,6 @@ if ($res_p) {
                 </button>
             </div>
         </div>
-
-        <!-- Bloque de Alertas Automáticas (Glassmorphism Warning) -->
-        <?php if (!empty($equipos_incompletos)): ?>
-            <div class="alert mb-4 py-3 px-4" style="background: rgba(255, 193, 7, 0.05); border: 1px solid rgba(255, 193, 7, 0.2); backdrop-filter: blur(10px); border-radius: 15px;">
-                <div class="d-flex align-items-start">
-                    <div class="me-3 mt-1">
-                        <i class="fas fa-bell text-warning animate__animated animate__pulse animate__infinite" style="font-size: 1.2rem;"></i>
-                    </div>
-                    <div>
-                        <h6 class="text-warning fw-bold mb-2" style="letter-spacing: 0.5px;">COMPONENTES FALTANTES DETECTADOS</h6>
-                        <div class="row row-cols-1 row-cols-md-2 g-2">
-                            <?php foreach ($equipos_incompletos as $alerta): ?>
-                                <div class="col">
-                                    <span class="text-white-50 small">
-                                        <i class="fas fa-exclamation-circle me-1 text-warning" style="font-size: 0.7rem;"></i>
-                                        El <strong>PC-<?= str_pad($alerta['numero_puesto'], 2, '0', STR_PAD_LEFT) ?></strong> no tiene un <strong><?= htmlspecialchars($alerta['nombre_componente']) ?></strong> asignado. Rendimiento no óptimo.
-                                    </span>
-                                </div>
-                            <?php endforeach; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        <?php endif; ?>
 
         <div class="glass-card p-4">
             <div class="table-responsive">
@@ -561,7 +560,7 @@ if ($res_p) {
                             <select name="modelo_id" class="form-select" required>
                                 <option value="">Seleccione Modelo</option>
                                 <?php foreach($modelos_list as $mod): ?>
-                                    <option value="<?php echo $mod['id_modelo']; ?>"><?php echo htmlspecialchars($mod['nombre_modelo']); ?></option>
+                                <option value="<?php echo $mod['id']; ?>"><?php echo htmlspecialchars($mod['nombre_modelo']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
@@ -661,7 +660,7 @@ if ($res_p) {
                             <select name="modelo_id" id="edit_modelo_id" class="form-select" required>
                                 <option value="">Seleccione Modelo</option>
                                 <?php foreach($modelos_list as $mod): ?>
-                                    <option value="<?php echo $mod['id_modelo']; ?>"><?php echo htmlspecialchars($mod['nombre_modelo']); ?></option>
+                                <option value="<?php echo $mod['id']; ?>"><?php echo htmlspecialchars($mod['nombre_modelo']); ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>

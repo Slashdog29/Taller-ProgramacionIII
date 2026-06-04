@@ -264,6 +264,10 @@ $computadoras_list = [];
 $res_c = mysqli_query($conexion, "SELECT id, numero_puesto, direccion_ip FROM computadoras ORDER BY numero_puesto ASC");
 while ($c = mysqli_fetch_assoc($res_c)) $computadoras_list[] = $c;
 
+$res_m = mysqli_query($conexion, "SELECT * FROM marca ORDER BY nombremarca ASC");
+$marcas_list = [];
+while ($m = mysqli_fetch_assoc($res_m)) $marcas_list[] = $m;
+
 ?>
 
 <style>
@@ -430,11 +434,16 @@ while ($c = mysqli_fetch_assoc($res_c)) $computadoras_list[] = $c;
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">MARCA</label>
-                            <input name="marca" id="perifericoMarcaInput" class="form-control" list="marcasDataList" required autocomplete="off">
+                            <select name="marca" id="perifericoMarcaInput" class="form-select" required>
+                                <option value="">-- Seleccione Marca --</option>
+                                <?php foreach ($marcas_list as $m): ?>
+                                    <option value="<?php echo htmlspecialchars($m['nombremarca']); ?>"><?php echo htmlspecialchars($m['nombremarca']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">MODELO</label>
-                            <input name="modelo" class="form-control" required>
+                            <input name="modelo" class="form-control" required placeholder="Ej: Optiplex 3080">
                         </div>
                         <div class="col-md-4">
                             <label class="form-label text-white-50 small fw-bold">COLOR</label>
@@ -500,7 +509,12 @@ while ($c = mysqli_fetch_assoc($res_c)) $computadoras_list[] = $c;
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">MARCA</label>
-                            <input name="marca" id="edit_marca" class="form-control" list="marcasDataList" required autocomplete="off">
+                            <select name="marca" id="edit_marca" class="form-select" required>
+                                <option value="">-- Seleccione Marca --</option>
+                                <?php foreach ($marcas_list as $m): ?>
+                                    <option value="<?php echo htmlspecialchars($m['nombremarca']); ?>"><?php echo htmlspecialchars($m['nombremarca']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label text-white-50 small fw-bold">MODELO</label>
